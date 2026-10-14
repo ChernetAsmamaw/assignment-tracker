@@ -18,6 +18,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     status: STATUSES.includes(body.status as Status) ? (body.status as Status) : current.status,
     percent: typeof body.percent === "number" ? Math.min(100, Math.max(0, Math.round(body.percent))) : current.percent,
     notes: typeof body.notes === "string" ? body.notes.slice(0, 20000) : current.notes,
+    kind: body.kind === "group" || body.kind === "individual" ? body.kind : body.kind === null ? null : current.kind,
     resources: Array.isArray(body.resources)
       ? body.resources.slice(0, 200).map((r) => ({
           id: String(r.id || crypto.randomUUID()),

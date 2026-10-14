@@ -35,6 +35,7 @@ interface CanvasAssignment {
   due_at: string | null;
   html_url: string;
   points_possible: number | null;
+  group_category_id?: number | null;
   published?: boolean;
   submission?: { workflow_state: string; submitted_at: string | null };
 }
@@ -66,6 +67,7 @@ export async function getAssignments(): Promise<Assignment[]> {
           submitted:
             !!a.submission?.submitted_at ||
             a.submission?.workflow_state === "graded",
+          isGroup: a.group_category_id != null,
         }));
     }),
   );
@@ -89,10 +91,11 @@ function demoAssignments(): Assignment[] {
   const day = 24 * 60 * 60 * 1000;
   const at = (d: number) => new Date(Date.now() + d * day).toISOString();
   return sortByDue([
-    { id: "d1", name: "Problem Set 3", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(1), url: "#", points: 20, submitted: false },
-    { id: "d2", name: "Lab Report 2", course: "CHM135: Chemistry", courseCode: "CHM135", dueAt: at(3), url: "#", points: 15, submitted: false },
-    { id: "d3", name: "Essay Outline", course: "ENG140: Literature", courseCode: "ENG140", dueAt: at(6), url: "#", points: 10, submitted: false },
-    { id: "d4", name: "Quiz 2 Reflection", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-2), url: "#", points: 5, submitted: true },
-    { id: "d5", name: "Final Project Proposal", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(12), url: "#", points: 30, submitted: false },
+    { id: "d1", name: "Problem Set 3", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(1), url: "#", points: 20, submitted: false, isGroup: false },
+    { id: "d2", name: "Lab Report 2", course: "CHM135: Chemistry", courseCode: "CHM135", dueAt: at(3), url: "#", points: 15, submitted: false, isGroup: true },
+    { id: "d3", name: "Essay Outline", course: "ENG140: Literature", courseCode: "ENG140", dueAt: at(6), url: "#", points: 10, submitted: false, isGroup: false },
+    { id: "d4", name: "Quiz 2 Reflection", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-2), url: "#", points: 5, submitted: true, isGroup: false },
+    { id: "d6", name: "Midterm Review Notes", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-1), url: "#", points: 0, submitted: false, isGroup: false },
+    { id: "d5", name: "Final Project Proposal", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(12), url: "#", points: 30, submitted: false, isGroup: true },
   ]);
 }

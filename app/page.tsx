@@ -1,35 +1,78 @@
 import Link from "next/link";
 import { getAssignments, isDemo } from "@/lib/canvas";
 import { getAllProgress } from "@/lib/store";
-import { formatDue, relativeDue } from "@/lib/format";
-import { STATUS_LABEL, emptyProgress, type Assignment, type Progress } from "@/lib/types";
+import { countdown, formatDue } from "@/lib/format";
+import { STATUS_LABEL, emptyProgress, isGroupWork, type Assignment, type Progress } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const DAY = 24 * 60 * 60 * 1000;
+type Item = { a: Assignment; p: Progress };
 
-function bucket(a: Assignment, p: Progress) {
-  if (a.submitted || p.status === "done") return "Done";
-  if (!a.dueAt) return "No due date";
-  const t = new Date(a.dueAt).getTime() - Date.now();
-  if (t < 0) return "Overdue";
-  if (t < 7 * DAY) return "This week";
-  return "Later";
+const isDone = ({ a, p }: Item) => a.submitted || p.status === "done";
+
+function Card({ a, p }: Item) {
+  const c = countdown(a.dueAt);
+  const done = isDone({ a, p });
+  const status = done ? "done" : p.status;
+  return (
+    <Link href={`/a/${a.id}`} className={`card-g ${done ? "is-done" : `u-${c.urgency}`}`}>
+      <div className="deadline">
+        {done ? (
+          <div className="countdown"><span className="cd-label">{a.submitted ? "Submitted" : "Done"}</span></div>
+        ) : (
+          <div className="countdown">
+            <span className="cd-value">{c.value}</span>
+            <span className="cd-label">{c.label}</span>
+          </div>
+        )}
+        <div className="due-date">{formatDue(a.dueAt)}</div>
+      </div>
+      <div className="body">
+        <div className="tags">
+          <span className="chip">{a.courseCode}</span>
+          <span className={`kind ${isGroupWork(a, p) ? "group" : "solo"}`}>{isGroupWork(a, p) ? "Group" : "Individual"}</span>
+        </div>
+        <div className="title">{a.name}</div>
+      </div>
+      <div className="foot">
+        <div className="bar"><span style={{ width: `${done ? 100 : p.percent}%` }} /></div>
+        <div className="foot-row">
+          <span className={`pill ${status}`}>{STATUS_LABEL[status]}</span>
+          <span className="muted small">
+            {p.resources.length > 0 ? `${p.resources.length} resource${p.resources.length > 1 ? "s" : ""}` : `${done ? 100 : p.percent}%`}
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
 }
-const ORDER = ["Overdue", "This week", "Later", "No due date", "Done"];
+
+function Gallery({ title, items }: { title: string; items: Item[] }) {
+  return (
+    <section>
+      <h2 className="section-title">{title} <span className="count">{items.length}</span></h2>
+      {items.length === 0 ? (
+        <p className="muted small">Nothing due.</p>
+      ) : (
+        <div className="gallery">{items.map((it) => <Card key={it.a.id} {...it} />)}</div>
+      )}
+    </section>
+  );
+}
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ course?: string }> }) {
   const { course } = await searchParams;
   const [all, progress] = await Promise.all([getAssignments(), getAllProgress()]);
   const courses = [...new Set(all.map((a) => a.courseCode))].sort();
-  const list = course ? all.filter((a) => a.courseCode === course) : all;
+  const items: Item[] = (course ? all.filter((a) => a.courseCode === course) : all).map((a) => ({
+    a,
+    p: { ...emptyProgress(), ...progress[a.id] },
+  }));
 
-  const groups = new Map<string, { a: Assignment; p: Progress }[]>();
-  for (const a of list) {
-    const p = { ...emptyProgress(), ...progress[a.id] };
-    const b = bucket(a, p);
-    groups.set(b, [...(groups.get(b) ?? []), { a, p }]);
-  }
+  const open = items.filter((it) => !isDone(it));
+  const done = items.filter(isDone);
+  const next = open.find((it) => it.a.dueAt && new Date(it.a.dueAt).getTime() > Date.now());
+  const nextCd = next && countdown(next.a.dueAt);
 
   return (
     <>
@@ -44,40 +87,27 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
       {isDemo() && (
         <div className="banner">Showing sample assignments. Add your Quercus token (CANVAS_TOKEN) to load your real ones.</div>
       )}
+      {next && nextCd && (
+        <Link href={`/a/${next.a.id}`} className={`next-up u-${nextCd.urgency}`}>
+          <span className="muted small">Next deadline</span>
+          <span className="next-name">{next.a.name} <span className="muted">· {next.a.courseCode}</span></span>
+          <span className="next-when">{nextCd.value} {nextCd.label} · {formatDue(next.a.dueAt)}</span>
+        </Link>
+      )}
       <nav className="filters">
-        <Link href="/" className={!course ? "on" : ""}>All</Link>
+        <Link href="/" className={!course ? "on" : ""}>All courses</Link>
         {courses.map((c) => (
           <Link key={c} href={`/?course=${encodeURIComponent(c)}`} className={course === c ? "on" : ""}>{c}</Link>
         ))}
       </nav>
-      {list.length === 0 && <p className="muted">Nothing here. Enjoy the free time.</p>}
-      {ORDER.filter((g) => groups.has(g)).map((g) => (
-        <section key={g}>
-          <h3 className="section-title">{g} · {groups.get(g)!.length}</h3>
-          <div className="list">
-            {groups.get(g)!.map(({ a, p }) => {
-              const rel = relativeDue(a.dueAt);
-              const done = g === "Done";
-              const status = a.submitted && p.status !== "done" ? "done" : p.status;
-              return (
-                <Link key={a.id} href={`/a/${a.id}`} className="row">
-                  <div>
-                    <div className="name">{a.name}</div>
-                    <div className="meta">
-                      <span className="chip">{a.courseCode}</span>
-                      {formatDue(a.dueAt)}{" "}
-                      {rel && !done && <span className={g === "Overdue" ? "overdue" : g === "This week" ? "due-soon" : ""}>· {rel}</span>}
-                      {p.resources.length > 0 && <> · {p.resources.length} resource{p.resources.length > 1 ? "s" : ""}</>}
-                    </div>
-                  </div>
-                  <span className={`pill ${status}`}>{a.submitted ? "Submitted" : STATUS_LABEL[status]}</span>
-                  {!done && p.percent > 0 && <div className="bar"><span style={{ width: `${p.percent}%` }} /></div>}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      <Gallery title="Individual" items={open.filter((it) => !isGroupWork(it.a, it.p))} />
+      <Gallery title="Group" items={open.filter((it) => isGroupWork(it.a, it.p))} />
+      {done.length > 0 && (
+        <details className="done-block">
+          <summary className="section-title">Done <span className="count">{done.length}</span></summary>
+          <div className="gallery">{done.map((it) => <Card key={it.a.id} {...it} />)}</div>
+        </details>
+      )}
     </>
   );
 }

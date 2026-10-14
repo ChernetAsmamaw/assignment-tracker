@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { STATUS_LABEL, type Progress, type Resource, type Status } from "@/lib/types";
+import { STATUS_LABEL, type Kind, type Progress, type Resource, type Status } from "@/lib/types";
 
-export default function Editor({ id, initial }: { id: string; initial: Progress }) {
+export default function Editor({ id, initial, quercusGroup }: { id: string; initial: Progress; quercusGroup: boolean }) {
   const [p, setP] = useState<Progress>(initial);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [draft, setDraft] = useState({ title: "", url: "", note: "" });
@@ -39,8 +39,25 @@ export default function Editor({ id, initial }: { id: string; initial: Progress 
     setDraft({ title: "", url: "", note: "" });
   };
 
+  const kind: Kind = p.kind ?? (quercusGroup ? "group" : "individual");
+
   return (
     <>
+      <div className="card">
+        <h2>Type</h2>
+        <div className="seg">
+          {(["individual", "group"] as Kind[]).map((k) => (
+            <button key={k} type="button" aria-pressed={kind === k} onClick={() => update({ kind: k })}>
+              {k === "group" ? "Group" : "Individual"}
+            </button>
+          ))}
+        </div>
+        <p className="muted small" style={{ margin: "8px 0 0" }}>
+          {p.kind ? "Set by you." : `From Quercus${quercusGroup ? " (group assignment)" : ""}.`}
+          {p.kind && <> <button type="button" className="link small" onClick={() => update({ kind: null })}>Use Quercus setting</button></>}
+        </p>
+      </div>
+
       <div className="card">
         <h2>Progress</h2>
         <div className="seg" style={{ marginBottom: 14 }}>

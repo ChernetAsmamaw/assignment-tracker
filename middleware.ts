@@ -1,0 +1,23 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { COOKIE, authToken } from "@/lib/auth";
+
+export async function middleware(req: NextRequest) {
+  const password = process.env.APP_PASSWORD;
+  if (!password) return NextResponse.next(); // no password set: open (local dev)
+
+  const cookie = req.cookies.get(COOKIE)?.value;
+  if (cookie && cookie === (await authToken(password))) return NextResponse.next();
+
+  if (req.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const url = req.nextUrl.clone();
+  url.pathname = "/login";
+  url.search = "";
+  return NextResponse.redirect(url);
+}
+
+export const config = {
+  // The cron route checks CRON_SECRET itself.
+  matcher: ["/((?!login|api/login|api/cron|_next|favicon.ico).*)"],
+};

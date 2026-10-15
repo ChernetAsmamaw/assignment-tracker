@@ -121,3 +121,20 @@ button.link { border: none; background: none; color: var(--muted); padding: 0; f
 .done-block summary::before { content: "▸"; }
 .done-block[open] summary::before { content: "▾"; }
 .detail { max-width: 760px; }
+
+/* Assignment description dropdown */
+.about summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+.about summary::-webkit-details-marker { display: none; }
+.about summary h2 { margin: 0; }
+.about summary::after { content: "Show"; font-size: 13px; color: var(--accent); }
+.about[open] summary::after { content: "Hide"; }
+.about[open] summary { margin-bottom: 12px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 0 0 14px; }
+.facts div { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.facts dt { font-size: 12px; color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; text-transform: capitalize; }
+.description { overflow-wrap: anywhere; }
+.description img { max-width: 100%; height: auto; }
+.description table { border-collapse: collapse; max-width: 100%; display: block; overflow-x: auto; }
+.description td, .description th { border: 1px solid var(--border); padding: 4px 8px; }
+.description > :first-child { margin-top: 0; }

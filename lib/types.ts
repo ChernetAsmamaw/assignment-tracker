@@ -12,6 +12,12 @@ export interface Assignment {
   points: number | null;
   submitted: boolean;
   isGroup: boolean;
+  description: string | null; // sanitized HTML from Quercus
+  submissionTypes: string[];
+  allowedAttempts: number | null;
+  unlockAt: string | null;
+  lockAt: string | null;
+  gradingType: string | null;
 }
 
 export interface Resource {

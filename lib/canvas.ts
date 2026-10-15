@@ -1,3 +1,4 @@
+import sanitizeHtml from "sanitize-html";
 import type { Assignment } from "./types";
 
 const BASE = (process.env.CANVAS_BASE_URL || "https://q.utoronto.ca").replace(/\/$/, "");
@@ -36,6 +37,12 @@ interface CanvasAssignment {
   html_url: string;
   points_possible: number | null;
   group_category_id?: number | null;
+  description?: string | null;
+  submission_types?: string[];
+  allowed_attempts?: number | null;
+  unlock_at?: string | null;
+  lock_at?: string | null;
+  grading_type?: string | null;
   published?: boolean;
   submission?: { workflow_state: string; submitted_at: string | null };
 }
@@ -68,6 +75,12 @@ export async function getAssignments(): Promise<Assignment[]> {
             !!a.submission?.submitted_at ||
             a.submission?.workflow_state === "graded",
           isGroup: a.group_category_id != null,
+          description: a.description ? cleanHtml(a.description) : null,
+          submissionTypes: a.submission_types ?? [],
+          allowedAttempts: a.allowed_attempts != null && a.allowed_attempts > 0 ? a.allowed_attempts : null,
+          unlockAt: a.unlock_at ?? null,
+          lockAt: a.lock_at ?? null,
+          gradingType: a.grading_type ?? null,
         }));
     }),
   );
@@ -79,6 +92,25 @@ export async function getAssignment(id: string): Promise<Assignment | undefined>
   return (await getAssignments()).find((a) => a.id === id);
 }
 
+// Instructor-written HTML: keep formatting, drop scripts/styles, make Quercus links absolute.
+function cleanHtml(html: string): string {
+  return sanitizeHtml(html, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2", "span"]),
+    allowedAttributes: { a: ["href", "title", "target", "rel"], img: ["src", "alt", "width", "height"], td: ["colspan", "rowspan"], th: ["colspan", "rowspan"] },
+    allowedSchemes: ["http", "https", "mailto"],
+    transformTags: {
+      a: (tag, attribs) => ({
+        tagName: "a",
+        attribs: { ...attribs, href: absolute(attribs.href), target: "_blank", rel: "noreferrer" },
+      }),
+      img: (tag, attribs) => ({ tagName: "img", attribs: { ...attribs, src: absolute(attribs.src) } }),
+    },
+    allowedSchemesAppliedToAttributes: ["href", "src"],
+  });
+}
+
+const absolute = (url = "") => (url.startsWith("/") ? `${BASE}${url}` : url);
+
 function sortByDue(list: Assignment[]) {
   return list.sort((a, b) => {
     if (!a.dueAt) return 1;
@@ -87,15 +119,25 @@ function sortByDue(list: Assignment[]) {
   });
 }
 
+const demoDetails = {
+  description:
+    "<p>This is where the assignment instructions from Quercus appear.</p><ul><li>Answer all questions</li><li>Show your work</li></ul><p>See the <a href=\"https://q.utoronto.ca\" target=\"_blank\" rel=\"noreferrer\">course page</a> for the rubric.</p>",
+  submissionTypes: ["online_upload"],
+  allowedAttempts: null,
+  unlockAt: null,
+  lockAt: null,
+  gradingType: "points",
+};
+
 function demoAssignments(): Assignment[] {
   const day = 24 * 60 * 60 * 1000;
   const at = (d: number) => new Date(Date.now() + d * day).toISOString();
   return sortByDue([
-    { id: "d1", name: "Problem Set 3", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(1), url: "#", points: 20, submitted: false, isGroup: false },
-    { id: "d2", name: "Lab Report 2", course: "CHM135: Chemistry", courseCode: "CHM135", dueAt: at(3), url: "#", points: 15, submitted: false, isGroup: true },
-    { id: "d3", name: "Essay Outline", course: "ENG140: Literature", courseCode: "ENG140", dueAt: at(6), url: "#", points: 10, submitted: false, isGroup: false },
-    { id: "d4", name: "Quiz 2 Reflection", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-2), url: "#", points: 5, submitted: true, isGroup: false },
-    { id: "d6", name: "Midterm Review Notes", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-1), url: "#", points: 0, submitted: false, isGroup: false },
-    { id: "d5", name: "Final Project Proposal", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(12), url: "#", points: 30, submitted: false, isGroup: true },
+    { id: "d1", name: "Problem Set 3", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(1), url: "#", points: 20, submitted: false, isGroup: false, ...demoDetails },
+    { id: "d2", name: "Lab Report 2", course: "CHM135: Chemistry", courseCode: "CHM135", dueAt: at(3), url: "#", points: 15, submitted: false, isGroup: true, ...demoDetails },
+    { id: "d3", name: "Essay Outline", course: "ENG140: Literature", courseCode: "ENG140", dueAt: at(6), url: "#", points: 10, submitted: false, isGroup: false, ...demoDetails },
+    { id: "d4", name: "Quiz 2 Reflection", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-2), url: "#", points: 5, submitted: true, isGroup: false, ...demoDetails },
+    { id: "d6", name: "Midterm Review Notes", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-1), url: "#", points: 0, submitted: false, isGroup: false, ...demoDetails },
+    { id: "d5", name: "Final Project Proposal", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(12), url: "#", points: 30, submitted: false, isGroup: true, ...demoDetails },
   ]);
 }

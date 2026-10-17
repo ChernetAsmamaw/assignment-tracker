@@ -79,3 +79,42 @@ export function EstimateButton({ count }: { count: number }) {
     </div>
   );
 }
+
+export function PlannerAgent({ gemini, overrides }: { gemini: boolean; overrides: number }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [reply, setReply] = useState("");
+  const router = useRouter();
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setBusy(true);
+    const res = await fetch("/api/agents/planner", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ instruction: text }) });
+    const body = await res.json().catch(() => ({}));
+    setReply(body.reply ?? body.error ?? "Something went wrong.");
+    setBusy(false);
+    setText("");
+    router.refresh();
+  };
+  const reset = async () => {
+    await fetch("/api/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ clearOverrides: true }) });
+    setReply("Cleared your day-by-day changes.");
+    router.refresh();
+  };
+  return (
+    <div className="card coach" style={{ marginBottom: 16 }}>
+      <span className="ai-badge">{gemini ? "✦ Planner agent · Gemini" : "Planner agent"}</span>
+      <h2 className="coach-title">What&apos;s happening this week?</h2>
+      <form onSubmit={send} className="add-step">
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. I work Tuesday 5 to 10pm, gym Thursday mornings, keep Sunday free" />
+        <button className="primary" disabled={busy}>{busy ? "Replanning…" : "Replan"}</button>
+      </form>
+      {reply && <p style={{ margin: "10px 0 0" }}>✦ {reply}</p>}
+      {overrides > 0 && (
+        <p className="muted small" style={{ margin: "8px 0 0" }}>
+          {overrides} day{overrides === 1 ? "" : "s"} adjusted. <button type="button" className="link small" onClick={reset}>Reset to my usual hours</button>
+        </p>
+      )}
+    </div>
+  );
+}

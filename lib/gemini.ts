@@ -13,12 +13,14 @@ interface GeminiOptions {
   prompt: string;
   schema?: Schema; // OpenAPI-style response schema; the reply is parsed as JSON
   search?: boolean; // ground the answer with Google Search
+  functions?: { name: string; description: string; parameters: Schema }[]; // let Gemini pick a tool
   temperature?: number;
 }
 
 export interface GeminiResult<T> {
   data: T;
   sources: { title: string; url: string }[];
+  call?: { name: string; args: Record<string, unknown> };
 }
 
 export async function gemini<T>(opts: GeminiOptions): Promise<GeminiResult<T>> {
@@ -39,6 +41,7 @@ export async function gemini<T>(opts: GeminiOptions): Promise<GeminiResult<T>> {
       contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
       generationConfig,
       ...(opts.search ? { tools: [{ google_search: {} }] } : {}),
+      ...(opts.functions ? { tools: [{ functionDeclarations: opts.functions }] } : {}),
     }),
     signal: AbortSignal.timeout(25_000),
     cache: "no-store",
@@ -47,7 +50,10 @@ export async function gemini<T>(opts: GeminiOptions): Promise<GeminiResult<T>> {
 
   const body = await res.json();
   const cand = body.candidates?.[0];
-  const text: string = (cand?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("");
+  const parts = (cand?.content?.parts ?? []) as { text?: string; functionCall?: { name: string; args?: Record<string, unknown> } }[];
+  const fc = parts.find((p) => p.functionCall)?.functionCall;
+  const text = parts.map((p) => p.text ?? "").join("");
+  if (fc) return { data: text.trim() as T, sources: [], call: { name: fc.name, args: fc.args ?? {} } };
   if (!text) throw new Error(`Gemini returned no text (${cand?.finishReason ?? "unknown"})`);
 
   const sources = ((cand?.groundingMetadata?.groundingChunks ?? []) as { web?: { uri: string; title: string } }[])

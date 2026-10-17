@@ -4,7 +4,7 @@ import { loadAll } from "@/lib/data";
 import { formatDue } from "@/lib/format";
 import { hasGemini } from "@/lib/gemini";
 import { fmtHours, PRESSURE_LABEL } from "@/lib/planner";
-import { CoachCard, EstimateButton, HoursForm } from "./PlanClient";
+import { CoachCard, EstimateButton, HoursForm, PlannerAgent } from "./PlanClient";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,16 @@ export default async function PlanPage() {
 
   return (
     <>
+      <header className="page-head">
+        <div>
+          <span className="eyebrow">Planner agent</span>
+          <h1>Your next two weeks</h1>
+          <p>Assignment steps and exam study sessions, fitted into the hours you actually have.</p>
+        </div>
+      </header>
       {isDemo() && <div className="banner">Planning with sample assignments. Add your Quercus token (CANVAS_TOKEN) to plan your real ones.</div>}
+
+      <PlannerAgent gemini={hasGemini()} overrides={Object.keys(settings.overrides).length} />
 
       <section className="plan-head">
         <div className={`stat p-${plan.pressure}`}>
@@ -61,6 +70,7 @@ export default async function PlanPage() {
                 <strong>{d.label}</strong>
                 <span className={`small ${over ? "overdue" : "muted"}`}>{fmtHours(d.load)} / {fmtHours(d.capacity)}</span>
               </div>
+              {d.note && <div className="small" style={{ color: "var(--accent)" }}>✦ {d.note}</div>}
               <div className="load" title={`${d.load}h of ${d.capacity}h`}>
                 <span style={{ width: `${(Math.min(d.load, d.capacity) / maxLoad) * 100}%` }} />
                 {over && <span className="extra" style={{ width: `${((d.load - d.capacity) / maxLoad) * 100}%` }} />}
@@ -71,8 +81,8 @@ export default async function PlanPage() {
               ) : (
                 <ul>
                   {d.items.map((it) => (
-                    <li key={it.assignmentId + it.title}>
-                      <Link href={`/a/${it.assignmentId}`}>
+                    <li key={it.href + it.title}>
+                      <Link href={it.href} className={it.kind === "study" ? "is-study" : ""}>
                         <span className="chip">{it.courseCode}</span>
                         <span className="it-title">{it.title}</span>
                         <span className="muted small">{it.name} · {fmtHours(it.hours)}</span>

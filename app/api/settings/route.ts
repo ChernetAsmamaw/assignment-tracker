@@ -6,7 +6,12 @@ const hours = (v: unknown, fallback: number) => (typeof v === "number" && v >= 0
 export async function PUT(req: Request) {
   const body = await req.json().catch(() => ({}));
   const cur = await getSettings();
-  const next = { weekdayHours: hours(body.weekdayHours, cur.weekdayHours), weekendHours: hours(body.weekendHours, cur.weekendHours) };
+  const next = {
+    ...cur,
+    weekdayHours: hours(body.weekdayHours, cur.weekdayHours),
+    weekendHours: hours(body.weekendHours, cur.weekendHours),
+    overrides: body.clearOverrides ? {} : cur.overrides,
+  };
   await saveSettings(next);
   return NextResponse.json(next);
 }

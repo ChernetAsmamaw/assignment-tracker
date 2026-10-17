@@ -39,7 +39,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="detail">
-      <p className="small"><Link href="/">← All assignments</Link></p>
+      <p className="small"><Link href="/assignments">← All assignments</Link></p>
       <header style={{ marginBottom: 16 }}>
         <span className="chip">{a.courseCode}</span>
         <h1 style={{ fontSize: 24, margin: "6px 0 4px" }}>{a.name}</h1>

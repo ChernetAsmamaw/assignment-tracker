@@ -1,60 +1,59 @@
-# Pace: your Quercus study coach
+# Pace: your AI study team
 
-Pace pulls every assignment from Quercus (UofT's Canvas), uses **Google Gemini** to break each one into steps with time estimates, and schedules them into a week that fits the hours you actually have. It warns you about crunch days and deadlines that won't fit *before* they happen, and emails you each morning with today's plan.
+Pace connects to Quercus (UofT's Canvas) and gives every student a small team of **AI agents, powered by Google Gemini**. They plan your week around your real life, build exam study timelines grounded in learning science, and measure how well you actually know each topic. Deadlines are only the starting point.
 
-Built for **Hack the Valley 11**.
+Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free tier, Vercel Hobby, Upstash free and Resend free.
 
-![Week plan](docs/plan.png)
+![Today](docs/today.png)
 
-## Why
+## The agents
 
-Student burnout rarely comes from one hard assignment. It comes from five reasonable ones landing in the same week, noticed too late. Quercus tells you *when* things are due, never *how much work* they are or whether your week can hold it. Pace answers "what should I work on today, and is this week going to break me?"
+| Agent | What it does | How |
+| --- | --- | --- |
+| **Command bar** (⌘K) | One box for everything: "I work Tuesday 5 to 10", "Midterm in CSC263 on the 28th", "Quiz me on heaps". | Gemini **function calling** picks the right agent and extracts its arguments, then the app runs it. |
+| **Planner** | Fits every assignment step and study session into the hours you have each day. Takes plain-English changes to your week. Flags crunch days, missing rest days and deadlines that won't fit, and writes a weekly coaching note. | Deterministic earliest-deadline-first scheduler in Toronto time. Gemini turns your message into per-day hour changes (structured output). |
+| **Study Plan** | Builds a day-by-day timeline to an exam: learn each topic, review it 1, 3 and 7 days later, mixed timed practice, a mock exam two days out, and a light final review. Weakest topics go first. Sessions show up in your planner and the morning email. | Spaced-repetition scheduler. Gemini works out topics from your course if you don't list them and writes concrete activities for each session. |
+| **Performance** | Reads your real Quercus grades per course (average, trend, late and missed work) and your topic mastery, then tells you where to focus. Quizzes you to measure proficiency, and the score feeds back into your study plans. | Gemini writes 5-question quizzes graded in the browser. Mastery is a weighted moving score per topic. Gemini writes insights from the numbers. |
+| **Assignment coach** | Breaks any assignment into steps with hour estimates and easy-to-miss requirements, finds resources, and answers questions from the instructor's instructions. | Gemini with JSON schemas over the Quercus description. |
 
-## What it does
+Every agent has a rule-based fallback, so the app works without a key and never shows a blank screen in a demo.
 
-- **Live Quercus sync.** Every published assignment across your active courses: due dates, points, submission type, group or individual, the full instructions, and whether you've submitted.
-- **✦ Break it down with Gemini.** Gemini reads the instructor's actual instructions and returns 3 to 8 specific steps with hour estimates, a one-line approach and the easy-to-miss requirements ("ACS citation style", "attach raw data as an appendix"). Checking steps off drives your progress.
-- **Week planner.** A deterministic scheduler fits every remaining step into your daily study budget (weekday and weekend hours), earliest deadline first, as early as it fits.
-- **Burnout signals.** A weekly status (calm, busy, crunch, overloaded), the number of full days, whether you still have a light day, and a list of assignments that won't fit before their deadline, with how many hours short you are.
-- **✦ Gemini coach.** A short, specific note about your week: which day to protect, what to start tonight, when to ask for an extension.
-- **✦ Estimate everything.** One Gemini call sizes every assignment you haven't broken down yet, so the plan is realistic from day one.
-- **✦ Find resources.** Gemini picks out the key concepts in the instructions and turns them into video and scholarly searches, alongside links the instructor already put in Quercus. One click saves any of them to the assignment's resource list.
-- **✦ Ask about this assignment.** Questions answered from the real instructions ("what citation style?"). It explains and plans; it won't write the graded work.
-- **Morning email.** At 8am Toronto time: today's plan with hours, the week's status, at-risk work and everything due in the next few days.
-- **Tracking.** Gallery of cards with big countdowns, group and individual sections, status, notes and a resource list per assignment.
-
-Every Gemini feature has a rule-based fallback, so the app keeps working without a key or if the API is slow.
-
-| Assignment page | Home |
+| Study plan timeline | Performance and quiz |
 | --- | --- |
-| ![Assignment](docs/assignment.png) | ![Home](docs/home.png) |
+| ![Study plan](docs/study-plan.png) | ![Performance](docs/performance.png) |
+
+| Planner | Command bar | Phone |
+| --- | --- | --- |
+| ![Planner](docs/planner.png) | ![Command bar](docs/command-bar.png) | ![Mobile](docs/mobile.png) |
+
+## Design
+
+The interface borrows from the Arc browser: a translucent sidebar on a soft gradient frame, the main content on a floating rounded panel, courses as coloured **Spaces**, pinned tiles for each agent, and a ⌘K command bar. It works in light and dark mode and on phones.
 
 ## Tech stack
 
-- **Next.js 15** (App Router, React 19, TypeScript) on **Vercel**, with Vercel Cron for the daily email
-- **Google Gemini API** (`gemini-2.5-flash`) over REST with structured JSON output (response schemas)
-- **Canvas LMS REST API** for Quercus data
-- **Upstash Redis** for progress, steps, settings and a cache of AI answers
-- **Resend** for email
-- `sanitize-html` to safely render instructor HTML
+- **Next.js 15** (App Router, React 19, TypeScript) on **Vercel**, with Vercel Cron for the 8am email
+- **Google Gemini API** (`gemini-2.5-flash`, free tier) over REST: structured JSON output and function calling
+- **Canvas LMS REST API** for Quercus assignments, instructions, submissions and grades
+- **Upstash Redis** for progress, steps, study plans, mastery, settings and an AI answer cache
+- **Resend** for email, `sanitize-html` for instructor HTML
 
 ```
-Quercus API ──▶ lib/canvas.ts ──▶ lib/planner.ts (scheduler + burnout signals) ──▶ Plan page, Today strip, email
-                     │                     ▲
-                     ▼                     │ steps / hour estimates
-               lib/ai.ts ──▶ Gemini (breakdown, estimates, coach, resources, Q&A)
+Quercus ─▶ canvas.ts ─▶ planner.ts (scheduler, burnout signals) ─▶ Today · Planner · email
+                │              ▲            ▲
+                ▼              │            │ study sessions
+        agents/* ─▶ Gemini     │ steps      └── agents/study.ts (spaced repetition)
+   router · planner · study · performance · ai.ts (assignment coach)
 ```
 
 ## Setup
 
 1. **Quercus token**: Quercus → Account → Settings → *+ New access token*.
-2. **Gemini key**: create a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
-3. **Resend**: sign up at resend.com with the address you want reminders at, and create an API key.
-4. **Deploy on Vercel**: import this repo and add **Upstash for Redis** from the *Storage* tab (sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`).
-5. **Environment variables** (tick **Production**):
-   - `CANVAS_TOKEN`, `GEMINI_API_KEY`, `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`
-   - optional: `GEMINI_MODEL` (default `gemini-2.5-flash`), `REMIND_DAYS` (default 3), `REMINDER_FROM`, `CANVAS_BASE_URL` (default `https://q.utoronto.ca`)
-6. Redeploy. Preview the email at `/api/cron/remind?preview=1` with header `Authorization: Bearer <CRON_SECRET>`.
+2. **Gemini key** (free, no billing needed): [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+3. **Resend**: sign up with the address you want reminders at and create an API key.
+4. **Vercel**: import this repo and add **Upstash for Redis** from the *Storage* tab.
+5. **Environment variables** (tick Production): `CANVAS_TOKEN`, `GEMINI_API_KEY`, `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`. Optional: `GEMINI_MODEL`, `REMIND_DAYS`, `REMINDER_FROM`, `CANVAS_BASE_URL` (any Canvas school).
+6. Redeploy.
 
 ## Local development
 
@@ -63,4 +62,4 @@ npm install
 npm run dev
 ```
 
-Without `CANVAS_TOKEN` it shows sample assignments; without Redis it saves to `.data/`; without `GEMINI_API_KEY` the AI features use simple rule-based plans.
+Without `CANVAS_TOKEN` it shows sample courses with grades; without Redis it saves to `.data/`; without `GEMINI_API_KEY` the agents use their rule-based fallbacks.

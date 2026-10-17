@@ -18,6 +18,8 @@ export interface Assignment {
   unlockAt: string | null;
   lockAt: string | null;
   gradingType: string | null;
+  score: number | null; // points earned, once graded
+  late: boolean;
 }
 
 export interface Resource {
@@ -76,3 +78,41 @@ export const percentFromSteps = (steps: Step[]) => {
   if (!total) return 0;
   return Math.round((steps.filter((s) => s.done).reduce((n, s) => n + s.hours, 0) / total) * 100);
 };
+
+// ---------- Study plans (exam prep timelines) ----------
+
+export type SessionKind = "learn" | "review" | "practice" | "mock";
+
+export interface StudySession {
+  id: string;
+  date: string; // YYYY-MM-DD in Toronto
+  kind: SessionKind;
+  topics: string[];
+  minutes: number;
+  activities: string[];
+  done: boolean;
+}
+
+export interface StudyPlan {
+  id: string;
+  title: string;
+  courseCode: string;
+  examAt: string; // ISO date-time
+  topics: string[];
+  sessions: StudySession[];
+  summary: string;
+  createdAt: string;
+}
+
+// ---------- Proficiency per topic ----------
+
+export interface Mastery {
+  key: string; // "COURSE::topic"
+  courseCode: string;
+  topic: string;
+  score: number; // 0-100
+  attempts: number;
+  history: { at: string; score: number }[];
+}
+
+export const masteryKey = (courseCode: string, topic: string) => `${courseCode}::${topic.trim().toLowerCase()}`;

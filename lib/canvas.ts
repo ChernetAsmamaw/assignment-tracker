@@ -3,8 +3,9 @@ import type { Assignment } from "./types";
 
 const BASE = (process.env.CANVAS_BASE_URL || "https://q.utoronto.ca").replace(/\/$/, "");
 
-// Show assignments due from two weeks ago onward, so recently missed ones stay visible.
+// The gallery shows assignments due from two weeks ago onward; older ones only feed grade insights.
 const LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
+export const isRecent = (a: Assignment) => !a.dueAt || new Date(a.dueAt).getTime() >= Date.now() - LOOKBACK_MS;
 
 export const isDemo = () => !process.env.CANVAS_TOKEN;
 
@@ -44,7 +45,7 @@ interface CanvasAssignment {
   lock_at?: string | null;
   grading_type?: string | null;
   published?: boolean;
-  submission?: { workflow_state: string; submitted_at: string | null };
+  submission?: { workflow_state: string; submitted_at: string | null; score?: number | null; late?: boolean };
 }
 
 export async function getAssignments(): Promise<Assignment[]> {
@@ -53,7 +54,6 @@ export async function getAssignments(): Promise<Assignment[]> {
   const courses = await canvasGetAll<CanvasCourse>(
     "/courses?enrollment_state=active&enrollment_type=student&per_page=100",
   );
-  const cutoff = Date.now() - LOOKBACK_MS;
 
   const perCourse = await Promise.all(
     courses.map(async (c) => {
@@ -62,7 +62,6 @@ export async function getAssignments(): Promise<Assignment[]> {
       ).catch(() => [] as CanvasAssignment[]); // some courses hide the assignments tab
       return list
         .filter((a) => a.published !== false)
-        .filter((a) => !a.due_at || new Date(a.due_at).getTime() >= cutoff)
         .map<Assignment>((a) => ({
           id: String(a.id),
           name: a.name,
@@ -81,6 +80,8 @@ export async function getAssignments(): Promise<Assignment[]> {
           unlockAt: a.unlock_at ?? null,
           lockAt: a.lock_at ?? null,
           gradingType: a.grading_type ?? null,
+          score: a.submission?.workflow_state === "graded" && a.submission.score != null ? a.submission.score : null,
+          late: !!a.submission?.late,
         }));
     }),
   );
@@ -127,6 +128,8 @@ const demoDetails = {
   unlockAt: null,
   lockAt: null,
   gradingType: "points",
+  score: null,
+  late: false,
 };
 
 const demoText: Record<string, string> = {
@@ -145,8 +148,13 @@ function demoAssignments(): Assignment[] {
     { id: "d1", name: "Problem Set 3", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(1), url: "#", points: 20, submitted: false, isGroup: false, ...demoDetails, description: demoText.d1 },
     { id: "d2", name: "Lab Report 2", course: "CHM135: Chemistry", courseCode: "CHM135", dueAt: at(3), url: "#", points: 15, submitted: false, isGroup: true, ...demoDetails, description: demoText.d2 },
     { id: "d3", name: "Essay Outline", course: "ENG140: Literature", courseCode: "ENG140", dueAt: at(6), url: "#", points: 10, submitted: false, isGroup: false, ...demoDetails, description: demoText.d3 },
-    { id: "d4", name: "Quiz 2 Reflection", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-2), url: "#", points: 5, submitted: true, isGroup: false, ...demoDetails, description: demoText.d4 },
+    { id: "d4", name: "Quiz 2 Reflection", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-2), url: "#", points: 5, submitted: true, isGroup: false, ...demoDetails, description: demoText.d4, score: 4 },
     { id: "d6", name: "Midterm Review Notes", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-1), url: "#", points: 0, submitted: false, isGroup: false, ...demoDetails, description: demoText.d6 },
+    { id: "g1", name: "Problem Set 1", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(-24), url: "#", points: 20, submitted: true, isGroup: false, ...demoDetails, description: null, score: 17 },
+    { id: "g2", name: "Problem Set 2", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(-10), url: "#", points: 20, submitted: true, isGroup: false, ...demoDetails, description: null, score: 13, late: true },
+    { id: "g3", name: "Lab Report 1", course: "CHM135: Chemistry", courseCode: "CHM135", dueAt: at(-13), url: "#", points: 15, submitted: true, isGroup: true, ...demoDetails, description: null, score: 13.5 },
+    { id: "g4", name: "Quiz 1", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-16), url: "#", points: 5, submitted: true, isGroup: false, ...demoDetails, description: null, score: 3 },
+    { id: "g5", name: "Close Reading Response", course: "ENG140: Literature", courseCode: "ENG140", dueAt: at(-8), url: "#", points: 10, submitted: true, isGroup: false, ...demoDetails, description: null, score: 9 },
     { id: "d5", name: "Final Project Proposal", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(12), url: "#", points: 30, submitted: false, isGroup: true, ...demoDetails, description: demoText.d5 },
   ]);
 }

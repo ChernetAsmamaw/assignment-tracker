@@ -44,9 +44,11 @@ export async function saveProgress(id: string, p: Progress): Promise<void> {
 export interface Settings {
   weekdayHours: number;
   weekendHours: number;
+  // Per-day study hours set by the Planner agent, e.g. { "2026-10-20": 1 } for a work shift.
+  overrides: Record<string, { hours: number; reason: string }>;
 }
 
-export const DEFAULT_SETTINGS: Settings = { weekdayHours: 4, weekendHours: 3 };
+export const DEFAULT_SETTINGS: Settings = { weekdayHours: 4, weekendHours: 3, overrides: {} };
 const SETTINGS_FILE = path.join(process.cwd(), ".data", "settings.json");
 
 export async function getSettings(): Promise<Settings> {
@@ -86,4 +88,33 @@ export async function cached<T>(key: string, ttlSeconds: number, make: () => Pro
   const value = await make();
   memo.set(k, { at: Date.now(), value });
   return value;
+}
+
+// Generic keyed collections (study plans, topic mastery): a Redis hash, or a JSON file locally.
+export async function listAll<T>(name: string): Promise<Record<string, T>> {
+  if (redis) return (await redis.hgetall<Record<string, T>>(name)) ?? {};
+  try {
+    return JSON.parse(await fs.readFile(path.join(process.cwd(), ".data", `${name}.json`), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+export async function getOne<T>(name: string, id: string): Promise<T | null> {
+  if (redis) return (await redis.hget<T>(name, id)) ?? null;
+  return (await listAll<T>(name))[id] ?? null;
+}
+
+export async function putOne<T>(name: string, id: string, value: T | null): Promise<void> {
+  if (redis) {
+    if (value === null) await redis.hdel(name, id);
+    else await redis.hset(name, { [id]: value });
+    return;
+  }
+  const all = await listAll<T>(name);
+  if (value === null) delete all[id];
+  else all[id] = value;
+  const file = path.join(process.cwd(), ".data", `${name}.json`);
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, JSON.stringify(all, null, 2));
 }

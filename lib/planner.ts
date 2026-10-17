@@ -1,5 +1,5 @@
 import type { Settings } from "./store";
-import type { Assignment, Progress } from "./types";
+import type { Assignment, Progress, StudyPlan } from "./types";
 
 // Turns open assignments into a day-by-day work plan that respects how many
 // hours a day you can study, and flags days and deadlines that won't fit.
@@ -9,7 +9,9 @@ const DAY = 24 * 60 * 60 * 1000;
 const HORIZON_DAYS = 21;
 
 export interface PlanItem {
-  assignmentId: string;
+  kind: "assignment" | "study";
+  href: string;
+  assignmentId: string; // assignment id, or study plan id for study sessions
   name: string;
   courseCode: string;
   title: string;
@@ -22,6 +24,7 @@ export interface PlanDay {
   label: string;
   weekend: boolean;
   capacity: number;
+  note: string; // why capacity differs from the usual, set by the Planner agent
   load: number;
   items: PlanItem[];
 }
@@ -73,17 +76,44 @@ export function guessHours(a: Assignment): number {
 
 export const isOpen = (a: Assignment, p: Progress) => !a.submitted && p.status !== "done";
 
-export function buildPlan(assignments: Assignment[], progress: Record<string, Progress>, settings: Settings, now = new Date()): Plan {
+export function buildPlan(
+  assignments: Assignment[],
+  progress: Record<string, Progress>,
+  settings: Settings,
+  studyPlans: StudyPlan[] = [],
+  now = new Date(),
+): Plan {
   const days: PlanDay[] = [];
   for (let i = 0; i < HORIZON_DAYS; i++) {
     const d = new Date(now.getTime() + i * DAY);
     const weekend = isWeekend(d);
-    let capacity = weekend ? settings.weekendHours : settings.weekdayHours;
+    const key = dayKey(d);
+    const override = settings.overrides?.[key];
+    let capacity = override ? override.hours : weekend ? settings.weekendHours : settings.weekdayHours;
     // Late in the day, today only has the evening left.
     if (i === 0) capacity = Math.min(capacity, Math.max(0, 23 - hourIn(now)));
-    days.push({ key: dayKey(d), label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayLabel(d), weekend, capacity, load: 0, items: [] });
+    days.push({ key, label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayLabel(d), weekend, capacity, note: override?.reason ?? "", load: 0, items: [] });
   }
   const lastKey = days[days.length - 1].key;
+
+  // Exam study sessions are fixed appointments: they take their day's time first.
+  for (const sp of studyPlans) {
+    for (const s of sp.sessions) {
+      const day = days.find((d) => d.key === s.date);
+      if (!day || s.done) continue;
+      day.load = round(day.load + s.minutes / 60);
+      day.items.push({
+        kind: "study",
+        href: `/study/${sp.id}`,
+        assignmentId: sp.id,
+        name: sp.title,
+        courseCode: sp.courseCode,
+        title: `${KIND_LABEL[s.kind]}: ${s.topics.join(", ")}`,
+        hours: round(s.minutes / 60),
+        dueAt: sp.examAt,
+      });
+    }
+  }
 
   let guessed = 0;
   const open = assignments
@@ -102,7 +132,7 @@ export function buildPlan(assignments: Assignment[], progress: Record<string, Pr
 
     const tasks = p.steps.length
       ? p.steps.filter((s) => !s.done).map((s) => ({ title: s.title, hours: s.hours }))
-      : [{ title: "Work on it", hours: (p.estimateHours ?? guessHours(a)) * (1 - p.percent / 100) }];
+      : [{ title: "Keep working", hours: (p.estimateHours ?? guessHours(a)) * (1 - p.percent / 100) }];
     if (!p.steps.length && p.estimateHours == null) guessed++;
 
     let overflow = 0;
@@ -151,8 +181,10 @@ function place(day: PlanDay, a: Assignment, title: string, hours: number) {
   day.load = round(day.load + hours);
   const same = day.items.find((it) => it.assignmentId === a.id && it.title === title);
   if (same) same.hours = round(same.hours + hours);
-  else day.items.push({ assignmentId: a.id, name: a.name, courseCode: a.courseCode, title, hours, dueAt: a.dueAt });
+  else day.items.push({ kind: "assignment", href: `/a/${a.id}`, assignmentId: a.id, name: a.name, courseCode: a.courseCode, title, hours, dueAt: a.dueAt });
 }
+
+export const KIND_LABEL = { learn: "Learn", review: "Review", practice: "Practice", mock: "Mock exam" } as const;
 
 export const PRESSURE_LABEL: Record<Pressure, string> = {
   calm: "Calm week",

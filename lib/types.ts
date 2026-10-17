@@ -18,6 +18,8 @@ export interface Assignment {
   unlockAt: string | null;
   lockAt: string | null;
   gradingType: string | null;
+  score: number | null; // points earned, once graded
+  late: boolean;
 }
 
 export interface Resource {
@@ -27,6 +29,13 @@ export interface Resource {
   note: string;
 }
 
+export interface Step {
+  id: string;
+  title: string;
+  hours: number;
+  done: boolean;
+}
+
 export interface Progress {
   status: Status;
   percent: number;
@@ -34,6 +43,12 @@ export interface Progress {
   resources: Resource[];
   // Manual override of Quercus's group/individual flag; null means use Quercus.
   kind: Kind | null;
+  // Work plan from the AI breakdown; percent follows the checked steps when present.
+  steps: Step[];
+  // Hours of work the whole assignment needs; null means use the points-based guess.
+  estimateHours: number | null;
+  // Gemini's short approach and easy-to-miss requirements, kept from the last breakdown.
+  guide: { approach: string; watchOuts: string[] } | null;
   updatedAt: string | null;
 }
 
@@ -43,6 +58,9 @@ export const emptyProgress = (): Progress => ({
   notes: "",
   resources: [],
   kind: null,
+  steps: [],
+  estimateHours: null,
+  guide: null,
   updatedAt: null,
 });
 
@@ -54,3 +72,47 @@ export const STATUS_LABEL: Record<Status, string> = {
   in_progress: "In progress",
   done: "Done",
 };
+
+export const percentFromSteps = (steps: Step[]) => {
+  const total = steps.reduce((n, s) => n + s.hours, 0);
+  if (!total) return 0;
+  return Math.round((steps.filter((s) => s.done).reduce((n, s) => n + s.hours, 0) / total) * 100);
+};
+
+// ---------- Study plans (exam prep timelines) ----------
+
+export type SessionKind = "learn" | "review" | "practice" | "mock";
+
+export interface StudySession {
+  id: string;
+  date: string; // YYYY-MM-DD in Toronto
+  kind: SessionKind;
+  topics: string[];
+  minutes: number;
+  activities: string[];
+  done: boolean;
+}
+
+export interface StudyPlan {
+  id: string;
+  title: string;
+  courseCode: string;
+  examAt: string; // ISO date-time
+  topics: string[];
+  sessions: StudySession[];
+  summary: string;
+  createdAt: string;
+}
+
+// ---------- Proficiency per topic ----------
+
+export interface Mastery {
+  key: string; // "COURSE::topic"
+  courseCode: string;
+  topic: string;
+  score: number; // 0-100
+  attempts: number;
+  history: { at: string; score: number }[];
+}
+
+export const masteryKey = (courseCode: string, topic: string) => `${courseCode}::${topic.trim().toLowerCase()}`;

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getAssignment } from "@/lib/canvas";
 import { getProgress } from "@/lib/store";
 import { countdown, formatDue } from "@/lib/format";
+import { hasGemini } from "@/lib/gemini";
 import Editor from "./Editor";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="detail">
-      <p className="small"><Link href="/">← All assignments</Link></p>
+      <p className="small"><Link href="/assignments">← All assignments</Link></p>
       <header style={{ marginBottom: 16 }}>
         <span className="chip">{a.courseCode}</span>
         <h1 style={{ fontSize: 24, margin: "6px 0 4px" }}>{a.name}</h1>
@@ -73,7 +74,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ id:
           <p className="muted small">No description on Quercus.</p>
         )}
       </details>
-      <Editor id={id} initial={initial} quercusGroup={a.isGroup} />
+      <Editor id={id} initial={initial} quercusGroup={a.isGroup} gemini={hasGemini()} />
     </div>
   );
 }

@@ -27,6 +27,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           note: String(r.note ?? "").slice(0, 2000),
         }))
       : current.resources,
+    steps: Array.isArray(body.steps)
+      ? body.steps.slice(0, 30).map((s) => ({
+          id: String(s.id || crypto.randomUUID()),
+          title: String(s.title ?? "").slice(0, 200),
+          hours: Math.min(40, Math.max(0, Number(s.hours) || 0)),
+          done: !!s.done,
+        }))
+      : current.steps,
+    estimateHours:
+      typeof body.estimateHours === "number" ? Math.min(100, Math.max(0, body.estimateHours)) : body.estimateHours === null ? null : current.estimateHours,
   };
   await saveProgress(id, next);
   return NextResponse.json(await getProgress(id));

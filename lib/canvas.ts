@@ -129,15 +129,24 @@ const demoDetails = {
   gradingType: "points",
 };
 
+const demoText: Record<string, string> = {
+  d1: "<p>Complete questions 1 to 5 on heaps and AVL trees. For each algorithm, give pseudocode and a worst-case runtime proof.</p><ul><li>Typeset in LaTeX and submit a single PDF to MarkUs</li><li>Collaboration is allowed in pairs, but write up your own solutions</li></ul><p>See the <a href=\"https://www.cs.toronto.edu/~csc263/\">course notes on heaps</a>.</p>",
+  d2: "<p>Write a lab report (max 6 pages) on the titration experiment from week 4. Include an abstract, methods, results with an error analysis, and a discussion comparing your value to the literature.</p><ul><li>One submission per group of 3</li><li>Use ACS citation style</li><li>Attach your raw data sheet as an appendix</li></ul>",
+  d3: "<p>Submit a one-page outline for your final essay on <em>Frankenstein</em>. State your thesis, three supporting arguments with textual evidence, and at least two secondary sources.</p><p>MLA format. Late outlines lose 5% per day.</p>",
+  d5: "<p>Propose a final project that applies a data structure from the course to a real problem. 2 pages: motivation, the data structure and why, an expected-complexity analysis, and a timeline with each member's role.</p>",
+  d6: "<p>Prepare a two-page summary of limits, continuity and the derivative rules for the midterm. Optional, not graded.</p>",
+  d4: "<p>Reflect on your Quiz 2 mistakes in 200 words.</p>",
+};
+
 function demoAssignments(): Assignment[] {
   const day = 24 * 60 * 60 * 1000;
   const at = (d: number) => new Date(Date.now() + d * day).toISOString();
   return sortByDue([
-    { id: "d1", name: "Problem Set 3", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(1), url: "#", points: 20, submitted: false, isGroup: false, ...demoDetails },
-    { id: "d2", name: "Lab Report 2", course: "CHM135: Chemistry", courseCode: "CHM135", dueAt: at(3), url: "#", points: 15, submitted: false, isGroup: true, ...demoDetails },
-    { id: "d3", name: "Essay Outline", course: "ENG140: Literature", courseCode: "ENG140", dueAt: at(6), url: "#", points: 10, submitted: false, isGroup: false, ...demoDetails },
-    { id: "d4", name: "Quiz 2 Reflection", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-2), url: "#", points: 5, submitted: true, isGroup: false, ...demoDetails },
-    { id: "d6", name: "Midterm Review Notes", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-1), url: "#", points: 0, submitted: false, isGroup: false, ...demoDetails },
-    { id: "d5", name: "Final Project Proposal", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(12), url: "#", points: 30, submitted: false, isGroup: true, ...demoDetails },
+    { id: "d1", name: "Problem Set 3", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(1), url: "#", points: 20, submitted: false, isGroup: false, ...demoDetails, description: demoText.d1 },
+    { id: "d2", name: "Lab Report 2", course: "CHM135: Chemistry", courseCode: "CHM135", dueAt: at(3), url: "#", points: 15, submitted: false, isGroup: true, ...demoDetails, description: demoText.d2 },
+    { id: "d3", name: "Essay Outline", course: "ENG140: Literature", courseCode: "ENG140", dueAt: at(6), url: "#", points: 10, submitted: false, isGroup: false, ...demoDetails, description: demoText.d3 },
+    { id: "d4", name: "Quiz 2 Reflection", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-2), url: "#", points: 5, submitted: true, isGroup: false, ...demoDetails, description: demoText.d4 },
+    { id: "d6", name: "Midterm Review Notes", course: "MAT137: Calculus", courseCode: "MAT137", dueAt: at(-1), url: "#", points: 0, submitted: false, isGroup: false, ...demoDetails, description: demoText.d6 },
+    { id: "d5", name: "Final Project Proposal", course: "CSC263: Data Structures", courseCode: "CSC263", dueAt: at(12), url: "#", points: 30, submitted: false, isGroup: true, ...demoDetails, description: demoText.d5 },
   ]);
 }

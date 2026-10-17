@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getAssignment } from "@/lib/canvas";
 import { getProgress } from "@/lib/store";
 import { countdown, formatDue } from "@/lib/format";
+import { hasGemini } from "@/lib/gemini";
 import Editor from "./Editor";
 
 export const dynamic = "force-dynamic";
@@ -73,7 +74,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ id:
           <p className="muted small">No description on Quercus.</p>
         )}
       </details>
-      <Editor id={id} initial={initial} quercusGroup={a.isGroup} />
+      <Editor id={id} initial={initial} quercusGroup={a.isGroup} gemini={hasGemini()} />
     </div>
   );
 }

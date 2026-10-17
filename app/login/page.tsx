@@ -2,7 +2,8 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   const { error } = await searchParams;
   return (
     <div className="card" style={{ maxWidth: 360, margin: "15vh auto 0" }}>
-      <h2>Assignment Tracker</h2>
+      <h2>Pace</h2>
+      <p className="muted small" style={{ marginTop: -6 }}>Your Quercus study coach</p>
       <form method="post" action="/api/login">
         <label htmlFor="pw">Password</label>
         <input id="pw" name="password" type="password" autoFocus required />

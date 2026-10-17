@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { getAssignments, isDemo } from "@/lib/canvas";
-import { getAllProgress } from "@/lib/store";
+import { isDemo } from "@/lib/canvas";
+import { loadAll } from "@/lib/data";
 import { countdown, formatDue } from "@/lib/format";
-import { STATUS_LABEL, emptyProgress, isGroupWork, type Assignment, type Progress } from "@/lib/types";
+import { fmtHours, PRESSURE_LABEL } from "@/lib/planner";
+import { STATUS_LABEL, isGroupWork, type Assignment, type Progress } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -62,11 +63,12 @@ function Gallery({ title, items }: { title: string; items: Item[] }) {
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ course?: string }> }) {
   const { course } = await searchParams;
-  const [all, progress] = await Promise.all([getAssignments(), getAllProgress()]);
+  const { assignments: all, progress, plan } = await loadAll();
+  const today = plan.days[0];
   const courses = [...new Set(all.map((a) => a.courseCode))].sort();
   const items: Item[] = (course ? all.filter((a) => a.courseCode === course) : all).map((a) => ({
     a,
-    p: { ...emptyProgress(), ...progress[a.id] },
+    p: progress[a.id],
   }));
 
   const open = items.filter((it) => !isDone(it));
@@ -76,14 +78,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
 
   return (
     <>
-      <header className="top">
-        <h1>Assignments</h1>
-        {process.env.APP_PASSWORD && (
-          <form method="post" action="/api/logout">
-            <button className="link small">Sign out</button>
-          </form>
-        )}
-      </header>
       {isDemo() && (
         <div className="banner">Showing sample assignments. Add your Quercus token (CANVAS_TOKEN) to load your real ones.</div>
       )}
@@ -94,6 +88,27 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
           <span className="next-when">{nextCd.value} {nextCd.label} · {formatDue(next.a.dueAt)}</span>
         </Link>
       )}
+      <Link href="/plan" className={`today p-${plan.pressure}`}>
+        <div className="today-head">
+          <span className="muted small">Today&apos;s plan</span>
+          <span className={`pressure p-${plan.pressure}`}>{PRESSURE_LABEL[plan.pressure]}</span>
+        </div>
+        {today.items.length === 0 ? (
+          <span className="small">Nothing scheduled today. {plan.openCount ? "Enjoy the breather." : ""}</span>
+        ) : (
+          <ul>
+            {today.items.slice(0, 4).map((it) => (
+              <li key={it.assignmentId + it.title}>
+                <strong>{fmtHours(it.hours)}</strong> {it.title} <span className="muted">· {it.courseCode} {it.name}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <span className="small muted">
+          {fmtHours(plan.next7Hours)} of work this week, {fmtHours(plan.next7Capacity)} available
+          {plan.risks.length > 0 && <> · <span className="overdue">{plan.risks.length} at risk</span></>} · See the full plan →
+        </span>
+      </Link>
       <nav className="filters">
         <Link href="/" className={!course ? "on" : ""}>All courses</Link>
         {courses.map((c) => (

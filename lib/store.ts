@@ -40,3 +40,50 @@ export async function saveProgress(id: string, p: Progress): Promise<void> {
   await fs.mkdir(path.dirname(FILE), { recursive: true });
   await fs.writeFile(FILE, JSON.stringify(all, null, 2));
 }
+
+export interface Settings {
+  weekdayHours: number;
+  weekendHours: number;
+}
+
+export const DEFAULT_SETTINGS: Settings = { weekdayHours: 4, weekendHours: 3 };
+const SETTINGS_FILE = path.join(process.cwd(), ".data", "settings.json");
+
+export async function getSettings(): Promise<Settings> {
+  let s: Partial<Settings> | null = null;
+  if (redis) s = await redis.get<Settings>("settings");
+  else {
+    try {
+      s = JSON.parse(await fs.readFile(SETTINGS_FILE, "utf8"));
+    } catch {}
+  }
+  return { ...DEFAULT_SETTINGS, ...(s ?? {}) };
+}
+
+export async function saveSettings(s: Settings): Promise<void> {
+  if (redis) {
+    await redis.set("settings", s);
+    return;
+  }
+  await fs.mkdir(path.dirname(SETTINGS_FILE), { recursive: true });
+  await fs.writeFile(SETTINGS_FILE, JSON.stringify(s, null, 2));
+}
+
+// Short-lived cache for AI answers so reloading a page doesn't call Gemini again.
+const memo = new Map<string, { at: number; value: unknown }>();
+
+export async function cached<T>(key: string, ttlSeconds: number, make: () => Promise<T>): Promise<T> {
+  const k = `ai:${key}`;
+  if (redis) {
+    const hit = await redis.get<T>(k);
+    if (hit != null) return hit;
+    const value = await make();
+    await redis.set(k, value, { ex: ttlSeconds });
+    return value;
+  }
+  const hit = memo.get(k);
+  if (hit && Date.now() - hit.at < ttlSeconds * 1000) return hit.value as T;
+  const value = await make();
+  memo.set(k, { at: Date.now(), value });
+  return value;
+}

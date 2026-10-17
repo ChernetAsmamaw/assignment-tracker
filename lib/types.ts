@@ -27,6 +27,13 @@ export interface Resource {
   note: string;
 }
 
+export interface Step {
+  id: string;
+  title: string;
+  hours: number;
+  done: boolean;
+}
+
 export interface Progress {
   status: Status;
   percent: number;
@@ -34,6 +41,12 @@ export interface Progress {
   resources: Resource[];
   // Manual override of Quercus's group/individual flag; null means use Quercus.
   kind: Kind | null;
+  // Work plan from the AI breakdown; percent follows the checked steps when present.
+  steps: Step[];
+  // Hours of work the whole assignment needs; null means use the points-based guess.
+  estimateHours: number | null;
+  // Gemini's short approach and easy-to-miss requirements, kept from the last breakdown.
+  guide: { approach: string; watchOuts: string[] } | null;
   updatedAt: string | null;
 }
 
@@ -43,6 +56,9 @@ export const emptyProgress = (): Progress => ({
   notes: "",
   resources: [],
   kind: null,
+  steps: [],
+  estimateHours: null,
+  guide: null,
   updatedAt: null,
 });
 
@@ -53,4 +69,10 @@ export const STATUS_LABEL: Record<Status, string> = {
   not_started: "Not started",
   in_progress: "In progress",
   done: "Done",
+};
+
+export const percentFromSteps = (steps: Step[]) => {
+  const total = steps.reduce((n, s) => n + s.hours, 0);
+  if (!total) return 0;
+  return Math.round((steps.filter((s) => s.done).reduce((n, s) => n + s.hours, 0) / total) * 100);
 };

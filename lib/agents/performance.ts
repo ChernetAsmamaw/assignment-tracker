@@ -77,6 +77,7 @@ export async function insights(stats: CourseStats[], mastery: Mastery[]): Promis
         prompt:
           `${summary}\n\nGive 3 insights. Each has a short title (under 8 words), a one sentence detail with a concrete next action, and a tone: ` +
           "good (going well), watch (slipping) or act (needs attention now). Then one sentence 'focus' for this week.",
+        fast: true,
         schema: {
           type: "OBJECT",
           properties: {
@@ -147,6 +148,7 @@ export async function makeQuiz(courseCode: string, topic: string, related: Assig
       required: ["questions"],
     },
     temperature: 0.8,
+    fast: true, // the bigger models think for 20s+ on a quiz; Flash-Lite answers in a few seconds
   });
   return (data.questions ?? []).filter((q) => q.options?.length >= 2 && q.answer >= 0 && q.answer < q.options.length).slice(0, 5);
 }

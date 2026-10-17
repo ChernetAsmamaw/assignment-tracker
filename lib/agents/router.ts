@@ -56,6 +56,7 @@ export async function route(text: string, assignments: Assignment[], context = "
           "Call the right function for the request. If none fits, answer briefly yourself (under 60 words) using the plan above.",
         prompt: text.slice(0, 800),
         functions: FUNCTIONS,
+        fast: true,
         temperature: 0.2,
       });
       if (call) {
@@ -66,7 +67,7 @@ export async function route(text: string, assignments: Assignment[], context = "
         if (call.name === "quiz_me") return { agent: "quiz", courseCode: String(a.courseCode ?? ""), topic: String(a.topic ?? "") };
         if (call.name === "open_assignment" && assignments.some((x) => x.id === a.assignmentId)) return { agent: "open", assignmentId: String(a.assignmentId) };
       }
-      if (data) return { agent: "answer", text: data };
+      if (data) return { agent: "answer", text: data.replace(/\*\*/g, "") };
     } catch (e) {
       console.error("router", e);
     }

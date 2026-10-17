@@ -34,7 +34,7 @@ export async function applyInstruction(instruction: string, settings: Settings):
       const { data } = await gemini<{ changes: ScheduleChange["changes"]; weekdayHours: number | null; weekendHours: number | null; reply: string }>({
         system:
           "You manage a student's study-hours calendar. Convert their message into changes. A day's hours are how many hours they can study that day " +
-          "(0 to 12). A shift or event reduces that day's hours by its length; 'day off from studying' means 0. Recurring things ('every Thursday') apply to each matching date listed. " +
+          "(0 to 12). A shift or event reduces that day's hours by its length; 'day off from studying' means 0. A weekday name on its own means only its next occurrence; only recurring wording ('every Thursday', 'Tuesdays') applies to each matching date. " +
           "Only change weekdayHours or weekendHours if they describe their usual routine. reply is one friendly sentence confirming what changed.",
         prompt:
           `Usual study hours: weekdays ${settings.weekdayHours}h, weekends ${settings.weekendHours}h.\n` +
@@ -58,6 +58,7 @@ export async function applyInstruction(instruction: string, settings: Settings):
           required: ["changes", "reply"],
         },
         temperature: 0.2,
+        fast: true,
       });
       const valid = new Set(days.map((d) => d.key));
       changes = (data.changes ?? []).filter((c) => valid.has(c.date)).map((c) => ({ date: c.date, hours: clamp(c.hours), reason: String(c.reason).slice(0, 80) }));

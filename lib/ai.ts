@@ -97,6 +97,7 @@ export async function estimateHours(list: Assignment[]): Promise<Record<string, 
       "Estimate the total hours an average undergraduate needs to complete each assignment below, including reading, " +
       "research, doing the work and checking it. Return one entry per id.\n\n" +
       list.map((a) => `--- id: ${a.id}\n${describe(a).slice(0, 1500)}`).join("\n\n"),
+    fast: true,
     schema: {
       type: "ARRAY",
       items: { type: "OBJECT", properties: { id: { type: "STRING" }, hours: { type: "NUMBER" } }, required: ["id", "hours"] },
@@ -125,6 +126,7 @@ export async function suggestResources(a: Assignment): Promise<{ concepts: strin
         prompt:
           `${describe(a)}\n\nList the 3 to 6 key concepts or skills the student needs for this assignment. ` +
           "For each, say in one sentence why it matters here, and give a precise search query (under 8 words) that would find a good explainer or source.",
+        fast: true,
         schema: {
           type: "OBJECT",
           properties: {
@@ -210,6 +212,7 @@ export async function coach(plan: Plan, settings: Settings): Promise<Coaching> {
           `${summary}\n\nWrite a short coaching note for this week. headline: under 10 words. message: 2 to 3 sentences, ` +
           "specific about which days and assignments matter most. tips: 2 to 3 concrete actions (e.g. start X on Tuesday, " +
           "ask for an extension on Y, protect Sunday as a rest day). Be warm and direct; don't repeat the numbers verbatim.",
+        fast: true,
         schema: {
           type: "OBJECT",
           properties: { headline: { type: "STRING" }, message: { type: "STRING" }, tips: { type: "ARRAY", items: { type: "STRING" } } },

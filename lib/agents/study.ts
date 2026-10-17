@@ -97,6 +97,7 @@ export async function createStudyPlan(req: StudyRequest, related: Assignment[], 
       const { data } = await gemini<{ topics: string[] }>({
         system: "You help university students prepare for exams.",
         prompt: `${context}\n\nList the 3 to 8 topics this exam most likely covers, as short names (2 to 5 words).`,
+        fast: true,
         schema: { type: "OBJECT", properties: { topics: { type: "ARRAY", items: { type: "STRING" } } }, required: ["topics"] },
       });
       topics = (data.topics ?? []).slice(0, 8);

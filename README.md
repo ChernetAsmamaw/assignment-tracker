@@ -33,7 +33,7 @@ The interface borrows from the Arc browser: a translucent sidebar on a soft grad
 ## Tech stack
 
 - **Next.js 15** (App Router, React 19, TypeScript) on **Vercel**, with Vercel Cron for the 8am email
-- **Google Gemini API** (`gemini-2.5-flash`, free tier) over REST: structured JSON output and function calling
+- **Google Gemini API** (`gemini-flash-latest`, free tier) over REST: structured JSON output and function calling
 - **Canvas LMS REST API** for Quercus assignments, instructions, submissions and grades
 - **Upstash Redis** for progress, steps, study plans, mastery, settings and an AI answer cache
 - **Resend** for email, `sanitize-html` for instructor HTML
@@ -52,7 +52,7 @@ Quercus ─▶ canvas.ts ─▶ planner.ts (scheduler, burnout signals) ─▶ T
 2. **Gemini key** (free, no billing needed): [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 3. **Resend**: sign up with the address you want reminders at and create an API key.
 4. **Vercel**: import this repo and add **Upstash for Redis** from the *Storage* tab.
-5. **Environment variables** (tick Production): `CANVAS_TOKEN`, `GEMINI_API_KEY`, `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`. Optional: `GEMINI_MODEL`, `REMIND_DAYS`, `REMINDER_FROM`, `CANVAS_BASE_URL` (any Canvas school).
+5. **Environment variables** (tick Production): `CANVAS_TOKEN`, `GEMINI_API_KEY`, `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`. Optional: `GEMINI_MODEL` (default `gemini-flash-latest`), `REMIND_DAYS`, `REMINDER_FROM`, `CANVAS_BASE_URL` (any Canvas school).
 6. Redeploy.
 
 ## Local development

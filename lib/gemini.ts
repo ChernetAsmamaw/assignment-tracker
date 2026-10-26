@@ -20,6 +20,7 @@ interface GeminiOptions {
   functions?: { name: string; description: string; parameters: Schema }[]; // let Gemini pick a tool
   temperature?: number;
   fast?: boolean; // short, simple tasks: start with the Flash-Lite models
+  audio?: { mimeType: string; data: string }; // base64 audio sent alongside the prompt
 }
 
 export interface GeminiResult<T> {
@@ -45,7 +46,7 @@ export async function gemini<T>(opts: GeminiOptions): Promise<GeminiResult<T>> {
       headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: opts.system }] },
-        contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+        contents: [{ role: "user", parts: [...(opts.audio ? [{ inlineData: opts.audio }] : []), { text: opts.prompt }] }],
         generationConfig,
         ...(opts.search ? { tools: [{ google_search: {} }] } : {}),
         ...(opts.functions ? { tools: [{ functionDeclarations: opts.functions }] } : {}),

@@ -25,6 +25,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // The cron route checks CRON_SECRET itself.
-  matcher: ["/((?!login|api/login|api/cron|_next|favicon.ico).*)"],
+  // The cron route checks CRON_SECRET itself, and the calendar feed checks its URL token.
+  matcher: ["/((?!login|api/login|api/cron|api/calendar|_next|favicon.ico).*)"],
 };

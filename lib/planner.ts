@@ -18,6 +18,7 @@ export interface PlanItem {
   title: string;
   hours: number;
   dueAt: string | null;
+  pace: number; // your learned pace for this course, already applied to hours
 }
 
 export interface PlanDay {
@@ -77,11 +78,19 @@ export function guessHours(a: Assignment): number {
 
 export const isOpen = (a: Assignment, p: Progress) => !a.submitted && p.status !== "done";
 
+// What the plan learns about you: how fast you really work in each course, and how much
+// you have in you today (from the morning check-in).
+export interface Adapt {
+  pace?: Record<string, number>; // course code to factor, 1.3 = 30% longer than estimated
+  today?: { factor: number; reason: string };
+}
+
 export function buildPlan(
   assignments: Assignment[],
   progress: Record<string, Progress>,
   settings: Settings,
   study: Record<string, StudyTask[]> = {}, // concepts each assignment still needs, by assignment id
+  adapt: Adapt = {},
   now = new Date(),
 ): Plan {
   const days: PlanDay[] = [];
@@ -92,8 +101,13 @@ export function buildPlan(
     const override = settings.overrides?.[key];
     let capacity = override ? override.hours : weekend ? settings.weekendHours : settings.weekdayHours;
     // Late in the day, today only has the evening left.
+    let note = override?.reason ?? "";
+    if (i === 0 && adapt.today && adapt.today.factor !== 1) {
+      capacity = round(capacity * adapt.today.factor);
+      note = adapt.today.reason || note;
+    }
     if (i === 0) capacity = Math.min(capacity, Math.max(0, 23 - hourIn(now)));
-    days.push({ key, label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayLabel(d), weekend, capacity, note: override?.reason ?? "", load: 0, items: [] });
+    days.push({ key, label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayLabel(d), weekend, capacity, note, load: 0, items: [] });
   }
   const lastKey = days[days.length - 1].key;
 
@@ -121,19 +135,20 @@ export function buildPlan(
     ];
     if (!p.steps.length && p.estimateHours == null) guessed++;
 
+    const pace = adapt.pace?.[a.courseCode] ?? 1;
     let overflow = 0;
     for (const t of tasks) {
-      let left = round(t.hours);
+      let left = round(t.hours * pace);
       for (let i = 0; i <= lastIdx && left > 0; i++) {
         const free = round(days[i].capacity - days[i].load);
         if (free < 0.25) continue;
         const take = Math.min(left, free);
-        place(days[i], a, t.title, take, t.href);
+        place(days[i], a, t.title, take, pace, t.href);
         left = round(left - take);
       }
       if (left > 0) {
         // Doesn't fit before the deadline: put it on the last possible day and flag it.
-        place(days[lastIdx], a, t.title, left, t.href);
+        place(days[lastIdx], a, t.title, left, pace, t.href);
         overflow += left;
       }
     }
@@ -163,7 +178,7 @@ export function buildPlan(
   };
 }
 
-function place(day: PlanDay, a: Assignment, title: string, hours: number, studyHref?: string) {
+function place(day: PlanDay, a: Assignment, title: string, hours: number, pace: number, studyHref?: string) {
   day.load = round(day.load + hours);
   const same = day.items.find((it) => it.assignmentId === a.id && it.title === title);
   if (same) same.hours = round(same.hours + hours);
@@ -177,6 +192,7 @@ function place(day: PlanDay, a: Assignment, title: string, hours: number, studyH
       title,
       hours,
       dueAt: a.dueAt,
+      pace,
     });
 }
 

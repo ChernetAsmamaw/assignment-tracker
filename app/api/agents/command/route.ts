@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { route } from "@/lib/agents/router";
 import { applyInstruction } from "@/lib/agents/planner";
-import { createStudyPlan } from "@/lib/agents/study";
 import { loadAll } from "@/lib/data";
 import { fmtHours, PRESSURE_LABEL } from "@/lib/planner";
-import { getSettings, listAll, putOne, saveSettings } from "@/lib/store";
-import type { Mastery } from "@/lib/types";
+import { getSettings, saveSettings } from "@/lib/store";
+import { studyHref } from "@/lib/study";
 
 export const maxDuration = 60;
 
@@ -27,18 +26,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ agent: "Planner", message: result.reply, href: "/plan" });
   }
   if (r.agent === "study") {
-    const exam = new Date(`${r.examDate}T09:00:00-04:00`);
-    if (!r.examDate || isNaN(exam.getTime()) || exam.getTime() < Date.now()) {
-      const q = new URLSearchParams({ course: r.courseCode, title: r.title, topics: r.topics.join(", ") });
-      return NextResponse.json({ agent: "Study Plan", message: "When is the exam? Add the date and I'll build the timeline.", href: `/study?${q}` });
-    }
-    const plan = await createStudyPlan(
-      { title: r.title, courseCode: r.courseCode, examAt: exam.toISOString(), topics: r.topics, notes: text },
-      assignments.filter((a) => a.courseCode === r.courseCode),
-      await listAll<Mastery>("mastery"),
-    );
-    await putOne("studyplans", plan.id, plan);
-    return NextResponse.json({ agent: "Study Plan", message: `Built a ${plan.sessions.length}-session plan for ${plan.courseCode} ${plan.title}.`, href: `/study/${plan.id}` });
+    const code = assignments.find((a) => a.courseCode.toLowerCase() === r.courseCode.toLowerCase())?.courseCode;
+    return code
+      ? NextResponse.json({ agent: "Study", message: `Opening ${code}: its class notes and the concepts its work needs.`, href: studyHref(code) })
+      : NextResponse.json({ agent: "Study", message: "Opening Study. Pick a course to see its notes and concepts.", href: "/study" });
   }
   if (r.agent === "quiz") {
     const q = new URLSearchParams({ course: r.courseCode, topic: r.topic });

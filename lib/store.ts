@@ -116,5 +116,8 @@ export async function putOne<T>(name: string, id: string, value: T | null): Prom
   else all[id] = value;
   const file = path.join(process.cwd(), ".data", `${name}.json`);
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(all, null, 2));
+  // Write then rename, so two saves at once can't leave a half-written file.
+  const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}`;
+  await fs.writeFile(tmp, JSON.stringify(all, null, 2));
+  await fs.rename(tmp, file);
 }

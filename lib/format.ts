@@ -12,6 +12,13 @@ export function formatDue(dueAt: string | null): string {
   });
 }
 
+// A calendar day in Toronto time, so the server and the browser print the same thing.
+export function formatDay(iso: string, long = false): string {
+  return new Date(iso).toLocaleDateString("en-CA", long
+    ? { timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric" }
+    : { timeZone: TZ, weekday: "short", month: "short", day: "numeric" });
+}
+
 export function relativeDue(dueAt: string | null): string {
   if (!dueAt) return "";
   const hours = (new Date(dueAt).getTime() - Date.now()) / 36e5;

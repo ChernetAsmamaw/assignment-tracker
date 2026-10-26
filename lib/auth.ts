@@ -6,3 +6,9 @@ export async function authToken(password: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+// Secret part of the calendar feed URL. Calendar apps can't sign in, so the link itself is the key;
+// changing APP_PASSWORD changes the link.
+export async function calendarToken(): Promise<string> {
+  return (await authToken(`calendar:${process.env.APP_PASSWORD ?? "local"}`)).slice(0, 32);
+}

@@ -8,13 +8,15 @@ import { fmtHours, isOpen, PRESSURE_LABEL } from "@/lib/planner";
 import { listOpportunities } from "@/lib/careers-store";
 import { deadlineInfo, isToApply, sortPriority, torontoToday } from "@/lib/careers";
 import { focusList, studyHref } from "@/lib/study";
+import { burnoutRisk, RISK_LABEL } from "@/lib/wellbeing";
+import { Agenda, CheckInCard } from "@/components/Wellbeing";
 
 export const dynamic = "force-dynamic";
 
 const TZ = "America/Toronto";
 
 export default async function Today() {
-  const [{ assignments, progress, plan, studies, mastery }, opps] = await Promise.all([loadAll(), listOpportunities()]);
+  const [{ assignments, progress, plan, studies, mastery, today: todayKey, checkin, checkins, sessions }, opps] = await Promise.all([loadAll(), listOpportunities()]);
   const now = new Date();
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" }).format(now));
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -33,6 +35,7 @@ export default async function Today() {
   const weakest = [...mastery].sort((a, b) => a.score - b.score)[0];
   const falling = stats.filter((s) => (s.trend ?? 0) <= -8);
   const newFinds = opps.filter((o) => o.status === "suggested").length;
+  const strain = burnoutRisk(checkins, plan, sessions, todayKey);
   const nextApp = sortPriority(opps.filter((o) => isToApply(o) && o.deadline && o.deadline >= torontoToday()))[0];
 
   return (
@@ -51,6 +54,15 @@ export default async function Today() {
       </header>
 
       {isDemo() && <div className="banner">You&apos;re looking at sample courses. Add your Quercus token (CANVAS_TOKEN) to load yours.</div>}
+
+      <CheckInCard
+        key={checkin?.at ?? "none"}
+        done={!!checkin}
+        energy={checkin?.energy}
+        sleep={checkin?.sleep}
+        reply={checkin?.reply}
+        capacity={today.capacity}
+      />
 
       <AskHero />
 
@@ -79,6 +91,12 @@ export default async function Today() {
             {falling.length ? `${falling.map((s) => s.courseCode).join(", ")} slipping` : weakest ? `Weakest topic: ${weakest.topic} (${weakest.score}%)` : "Take a quiz to measure a topic"}
           </span>
         </Link>
+        <Link href="/wellbeing" className={`agent g-well r-${strain.level}`}>
+          <span className="ico">♥</span>
+          <span className="muted small">Wellbeing agent</span>
+          <span className="big">{RISK_LABEL[strain.level]}</span>
+          <span className="small">{strain.drivers[0] ?? (checkins.length ? "Energy, sleep and workload look balanced" : "Check in to start tracking strain")}</span>
+        </Link>
         <Link href="/careers" className="agent g-career">
           <span className="ico">◆</span>
           <span className="muted small">Career agent</span>
@@ -99,20 +117,9 @@ export default async function Today() {
           {today.items.length === 0 ? (
             <p className="muted small" style={{ margin: 0 }}>Free day. Your planner left today open. Rest counts too.</p>
           ) : (
-            <div className="agenda">
-              {today.items.map((it) => (
-                <Link key={it.href + it.title} href={it.href}>
-                  <span className="h">{fmtHours(it.hours)}</span>
-                  <span>
-                    <strong>{it.title}</strong>
-                    <span className="muted small" style={{ display: "block" }}>{it.courseCode} · {it.name}</span>
-                  </span>
-                  <span className={`k ${it.kind}`}>{it.kind === "study" ? "Study" : "Assignment"}</span>
-                </Link>
-              ))}
-            </div>
+            <Agenda items={today.items} />
           )}
-          {today.note && <p className="muted small" style={{ margin: "10px 0 0" }}>Lighter day: {today.note}</p>}
+          {today.note && <p className="muted small" style={{ margin: "10px 0 0" }}>{today.note.startsWith("Lighter") ? today.note : `Lighter day: ${today.note}`}</p>}
         </div>
         <div className="card">
           <h2>Coming up</h2>

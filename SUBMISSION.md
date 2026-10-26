@@ -1,73 +1,74 @@
 # Pace: Hack the Valley 11 submission
 
-**Tagline:** An AI study team that lives on top of Quercus: it plans your week, builds your exam timeline and measures what you actually know.
+**Tagline:** An AI study team on top of Quercus that plans your week around the student you actually are today: how you slept, how you feel and how fast you really work.
 
-**Prize categories to select:** Top 3 (automatic), [MLH] Best Use of Gemini API, FDM: Best AI-Powered Tool for a Healthier Working Life, Best Healthcare & Well-being Hack, Best AI for Social Impact Hack. Add Best Solo Hack if you're entering alone, and Best Beginner Hack if everyone on the team has done at most one hackathon.
+**Prize categories to select:** Top 3 (automatic), [MLH] Best Use of Gemini API, FDM: Best AI-Powered Tool for a Healthier Working Life. Add Best Solo Hack if you're entering alone, and Best Beginner Hack if everyone on the team has done at most one hackathon.
 
 ## Write-up (paste into the submission form)
 
 ### Inspiration
-Quercus is where every UofT course lives, but it only answers one question: when is it due? It never tells you how much work something is, whether your week can hold it, how to prepare for a midterm, or which topics you're actually weak in. Students fill that gap with all-nighters, and burnout follows. We wanted to give every student what a great tutor, planner and coach would give them, built on the data their courses already have.
+Quercus tells you when something is due. It never tells you whether your week can hold it, and every planner app assumes you're the same person every day. You aren't. After four hours of sleep, a "4 hour study day" is a lie, and the plan that ignores it is how one bad night turns into an all-nighter and then burnout. We wanted a planner that notices how you're doing, adapts, and learns how long your work really takes.
 
 ### What it does
 Pace connects to Quercus and gives you a team of AI agents powered by Google Gemini.
 
-- **Command bar (⌘K):** type anything, like "I work Tuesday 5 to 10" or "midterm in CSC263 on the 28th". Gemini function calling sends it to the right agent.
-- **Planner agent:** fits every assignment step and exam study session into the hours you actually have each day. It understands plain-English changes to your week, flags crunch days, missing rest days and deadlines that won't fit (with how many hours short you are), and writes a weekly coaching note.
-- **Study Plan agent:** give it an exam and it builds a day-by-day timeline using spaced repetition (learn, then review at 1, 3 and 7 days), interleaved timed practice and a mock exam. Weakest topics come first, and Gemini writes concrete activities for every session.
-- **Performance agent:** reads your real Quercus grades (averages, trends, late and missed work), tells you where to focus, and quizzes you with Gemini-written questions. Quiz scores become a mastery score per topic that feeds back into your study plans.
-- **Assignment coach:** breaks any assignment into steps with time estimates, catches easy-to-miss requirements, finds resources and answers questions from the instructor's own instructions.
-- **Morning email:** today's plan, including study sessions, the week's status and what's due.
+- **Command bar (⌘K):** say anything, like "I work Tuesday 5 to 10" or "I slept 4 hours and I'm wiped". Gemini function calling sends it to the right agent.
+- **Wellbeing agent:** a 10-second morning check-in (energy and sleep). Running low? Today gets lighter and the rest moves to later days automatically. A transparent strain score catches burnout early from your energy, sleep, workload, missing rest days and after-midnight sessions, and tells you which of those is driving it.
+- **Focus timer that learns your pace:** press ▶ on any block for a 25/5 focus session. Finished blocks teach Pace how long work in each course really takes you ("you run 30% over estimates in CSC263"), and the planner re-estimates that course from then on.
+- **Planner agent:** fits every assignment step into the hours you actually have, understands plain-English changes to your week, flags crunch days, missing rest days and deadlines that won't fit, and writes a weekly coaching note.
+- **Calendar sync:** subscribe once in Google Calendar, Outlook or Apple Calendar and every study block and deadline sits next to your classes and shifts.
+- **Performance agent:** reads your real Quercus grades, spots courses that are slipping and quizzes you with Gemini-written questions to measure each topic.
+- **Class notes, assignment coach, internship Scout and a morning email** round it out.
 
-It deliberately helps students plan, understand and practise; it never writes graded work.
+It deliberately helps students plan, understand and practise; it never writes graded work, and it never gives medical advice.
 
 ### How we built it
-Next.js 15 (App Router, React 19, TypeScript) on Vercel. Quercus data comes from the Canvas LMS REST API, including submissions and grades. Gemini Flash is called over REST in two ways: structured JSON output with response schemas, so every agent returns typed data the app can schedule, and function calling for the command bar's routing. The planner and the spaced-repetition engine are our own deterministic algorithms, so the AI decides *what* and the code decides *when*. Upstash Redis stores progress, study plans, mastery and a cache of AI answers. Vercel Cron and Resend send the email. The UI is inspired by the Arc browser: a sidebar on a gradient frame, courses as coloured spaces and a ⌘K command bar. The whole stack runs on free tiers.
+Next.js 15 (App Router, React 19, TypeScript) on Vercel. Quercus data comes from the Canvas LMS REST API, including grades. Gemini Flash is called over REST with structured JSON output (typed data the app can schedule) and function calling (the command bar). The numbers are ours and deterministic: an earliest-deadline-first scheduler in Toronto time, a capacity model from energy and sleep, a strain score with named drivers, and pace learning that compares actual to planned minutes and shrinks toward 1 (as if you'd already done an hour on plan) so one slow night can't double your plan. Gemini decides what to say and what to do; the code decides how much and when. Upstash Redis stores everything, Vercel Cron and Resend send the email, and the calendar is a standard iCalendar feed. The whole stack runs on free tiers.
 
 ### Challenges we ran into
-Making LLM output safe to build on: schemas plus clamping of every estimate. Splitting work between AI and algorithms, so plans stay explainable and repeatable. Keeping a live demo bulletproof: every agent has a rule-based fallback. Time zones: a 9am deadline means the work has to be finished the day before.
+Making adaptation safe: learned pace has to move with real evidence but not overreact, so we used shrinkage and clamping, and only apply it after two finished blocks. Keeping AI out of the arithmetic, so plans stay explainable and repeatable. Time zones and daylight saving in both the scheduler and the calendar feed. Keeping a live demo bulletproof: every agent has a rule-based fallback.
 
 ### Accomplishments that we're proud of
-It runs on our real courses today. One sentence in the command bar can rebuild the week. Study plans, assignments and quiz results all feed one schedule.
+One sentence ("slept 4 hours, I'm wiped") replans the day. The strain score explains itself instead of being a black box. It runs on our real courses today.
 
 ### What we learned
-Agents work best when each one has a narrow job and a deterministic engine underneath. Structured output turns an LLM from a chatbot into a component.
+Agents work best with a narrow job and a deterministic engine underneath. Wellbeing features only help if they cost the student almost nothing, so the check-in is two taps.
 
 ### What's next
-Google and Outlook calendar sync, group task splitting for team projects, learning each student's real pace from completed steps, and opening it to any Canvas school.
+Learning a student's best hours of the day from focus sessions, group task splitting, two-way calendar sync that reads busy times, and opening it to any Canvas school.
 
 ### Built with
-nextjs, react, typescript, gemini-api, google-ai-studio, function-calling, canvas-lms-api, vercel, upstash-redis, resend
+nextjs, react, typescript, gemini-api, google-ai-studio, function-calling, canvas-lms-api, icalendar, vercel, upstash-redis, resend
 
 **Links:** GitHub: https://github.com/ChernetAsmamaw/assignment-tracker · Live demo: https://assignment-tracker-ochre-xi.vercel.app
 
 ## 4-minute pitch script
 
-**0:00 to 0:25 · Problem.** "Quercus tells you when something is due. It doesn't tell you how much work it is, whether your week can hold it, how to study for the midterm, or what you're actually weak at. That gap is where all-nighters and burnout come from."
+**0:00 to 0:25 · Problem.** "Every planner assumes you're the same person every day. You're not. After four hours of sleep, your 4-hour study plan is a lie, and that's how one bad night becomes an all-nighter and then burnout."
 
-**0:25 to 0:40 · Product.** "Pace gives every student an AI study team on top of Quercus: a planner, a study-plan builder and a performance coach, all powered by Gemini."
+**0:25 to 0:40 · Product.** "Pace is an AI study team on top of Quercus that plans around the student you actually are today."
 
-**0:40 to 1:20 · Today and the command bar.** Show the Today page: greeting, agent tiles, today's agenda. Press ⌘K and type "I work Tuesday 5 to 10pm". "Gemini function calling picked the Planner agent. Tuesday is now a light day and the week is replanned."
+**0:40 to 1:30 · Check-in.** On Today, tap "Low" and enter 5 hours of sleep. "Today just went from 4 hours to 2.5, and the rest moved to later days before the deadlines. Gemini tells me what to start with." Then ⌘K: "I work Tuesday 5 to 10pm". "Function calling picked the Planner agent, and Tuesday is light now."
 
-**1:20 to 2:10 · Study Plan agent.** ⌘K: "Midterm in CSC263 next Wednesday on heaps, AVL trees and hashing." The timeline opens. "Learn, then review at 1, 3 and 7 days, which is spaced repetition, then timed practice and a mock exam. Gemini wrote what to do in each session. Those sessions are already in my planner."
+**1:30 to 2:20 · Focus and pace.** Press ▶ on a block, show the timer, then "I'm done, finished this block". Open Wellbeing. "Pace learned I take 20% longer than estimated in CSC263, so every CSC263 block is now longer. It's not a guess: it's actual over planned minutes, smoothed so one slow night can't wreck my plan."
 
-**2:10 to 2:50 · Performance agent.** Open Performance. "These are my real Quercus grades. CSC263 dropped 20 points, and the agent caught it." Take a 5-question quiz on heaps live and show the score ring and mastery bar. "My weakest topics get more reviews in my study plans."
+**2:20 to 3:00 · Strain.** Point at the gauge and drivers. "This is a strain score, not a diagnosis, and it shows its work: low energy, short sleep, no rest day this week. Gemini turns that into three things to change this week."
 
-**2:50 to 3:20 · Planner and assignment coach.** Show the two-week planner with a red day and the "won't fit" list. Open an assignment and click "Break it down with Gemini".
+**3:00 to 3:30 · Calendar and grades.** Show the calendar link and the blocks in Google Calendar. Flash Performance: "Real Quercus grades, and it caught CSC263 slipping."
 
-**3:20 to 4:00 · Close.** "The AI decides what to do, our algorithms decide when, and you get your evenings back. It runs on free tiers, works with any Canvas school, and it's live on my real courses right now."
+**3:30 to 4:00 · Close.** "The AI decides what to say, our algorithms decide how much and when, and you get your evenings back. Free tiers, any Canvas school, and it's live on my real courses."
 
 ## Likely Q&A
-- **Where is Gemini used?** Function calling for the command bar, plus structured output for the planner changes, study topics and activities, quizzes, insights, assignment breakdowns, estimates, resources and Q&A.
-- **Why not let the AI schedule everything?** LLMs are bad at arithmetic and not repeatable. Gemini decides what to do; our deterministic schedulers decide when. Same inputs always give the same plan.
-- **Is it learning science or vibes?** Spaced repetition, active recall, interleaving and practice testing are some of the best-supported study techniques. The timeline encodes them directly.
-- **Cost?** Zero. Gemini free tier, Vercel Hobby, Upstash free, Resend free. AI answers are cached so quotas last.
-- **Cheating?** It plans, explains and quizzes. Its prompts forbid producing graded work.
-- **Privacy?** One student's token in a Vercel environment variable, a password-protected site and nothing shared.
+- **Where is Gemini used?** Function calling for the command bar; structured output for check-in replies, the wellbeing note, planner changes, quizzes, insights, assignment breakdowns and estimates.
+- **How is pace learned?** Finished focus blocks only. Per course, (actual minutes + 60) / (planned minutes + 60) over the last 12 blocks, clamped to 0.6 to 2x, applied after 2 blocks. Planned minutes are stored before pace is applied, so it doesn't compound.
+- **Is the strain score medical?** No. It's a transparent sum of named signals with fixed weights, meant to prompt a small change early. The coach never gives medical advice.
+- **Why not let the AI schedule?** LLMs are bad at arithmetic and not repeatable. Same inputs always give the same plan.
+- **Privacy?** One student's data, a password-protected site, and the calendar link is a secret token derived from the password.
+- **Cost?** Zero: Gemini free tier, Vercel Hobby, Upstash free, Resend free.
 
 ## Before you present
-1. Add `GEMINI_API_KEY` in Vercel (Production), then merge the PR.
-2. Create one real study plan ahead of time, and take one quiz so mastery isn't empty.
-3. Open the Planner and Performance pages once so their notes are cached.
-4. Practise the three ⌘K commands from the script.
-5. Have this morning's email open in Outlook.
+1. Make sure `GEMINI_API_KEY` and a Redis database are set in Vercel (Production), then merge the PR.
+2. Check in for the last few days and finish two focus blocks in one course so the pace card and strain chart aren't empty.
+3. Subscribe to the calendar feed in Google Calendar the day before (Google refreshes subscribed calendars every few hours).
+4. Open Wellbeing, Planner and Performance once so their notes are cached.
+5. Practise the two ⌘K commands from the script.

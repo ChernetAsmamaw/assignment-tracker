@@ -105,6 +105,9 @@ export default async function PlanPage() {
           {plan.guessed > 0 && ` ${plan.guessed} assignment${plan.guessed === 1 ? " uses" : "s use"} a rough guess.`}
         </p>
         {plan.guessed > 0 && hasGemini() && <EstimateButton count={plan.guessed} />}
+        <p className="muted small" style={{ margin: "10px 0 0" }}>
+          Want these blocks in Google Calendar or Outlook? <Link href="/wellbeing#calendar">Subscribe to your plan</Link>.
+        </p>
       </div>
     </>
   );

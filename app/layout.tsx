@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { COOKIE, authToken } from "@/lib/auth";
 import { getAssignments, isDemo } from "@/lib/canvas";
 import { courseColor } from "@/lib/colors";
-import { canSave, NO_DATABASE } from "@/lib/store";
+import { storageProblem } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: "Pace: your AI study team",
@@ -16,7 +16,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // The login page shares this layout, so only load courses for a signed-in visitor.
   const pw = process.env.APP_PASSWORD;
   const signedIn = !pw || (await cookies()).get(COOKIE)?.value === (await authToken(pw));
-  const assignments = signedIn ? await getAssignments().catch(() => []) : [];
+  const [assignments, problem] = signedIn ? await Promise.all([getAssignments().catch(() => []), storageProblem()]) : [[], null];
   const codes = [...new Set(assignments.map((a) => a.courseCode))].sort();
   const spaces = codes.map((code) => ({
     code,
@@ -32,7 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <Shell spaces={spaces} signOut={!!process.env.APP_PASSWORD} demo={isDemo()}>
-          {signedIn && !canSave() && <div className="banner" role="alert">{NO_DATABASE}</div>}
+          {problem && <div className="banner" role="alert">{problem}</div>}
           {children}
         </Shell>
       </body>

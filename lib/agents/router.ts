@@ -36,7 +36,7 @@ const FUNCTIONS = [
   {
     name: "open_study",
     description:
-      "The student wants a course's class notes or recordings, the concepts they need to understand for its assignments and projects, or to study a course.",
+      "The student wants a course's notes or class recordings, or to study a course.",
     parameters: {
       type: "OBJECT",
       properties: { courseCode: { type: "STRING", description: "One of the student's course codes" } },
@@ -90,7 +90,7 @@ export async function route(text: string, assignments: Assignment[], context = "
 function keywordRoute(text: string, assignments: Assignment[], courses: string[]): Route {
   const t = text.toLowerCase();
   const course = courses.find((c) => t.includes(c.toLowerCase())) ?? "";
-  if (/\b(notes?|lectures?|concepts?|understand)\b/.test(t)) return { agent: "study", courseCode: course };
+  if (/\b(notes?|lectures?)\b/.test(t)) return { agent: "study", courseCode: course };
   if (/\b(tired|exhausted|drained|burnt? out|sick|stressed|slept)\b/.test(t)) {
     const sleep = t.match(/slept\s+(\d+(?:\.\d)?)/);
     return { agent: "checkin", energy: /exhausted|drained|burnt? out|sick/.test(t) ? 1 : 2, sleep: sleep ? Number(sleep[1]) : null, note: text };

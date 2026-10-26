@@ -493,12 +493,6 @@ textarea.letter { min-height: 380px; margin-top: 12px; font: 14px/1.6 "Inter", s
 .course-icon { width: 72px; height: 72px; border-radius: 14px; display: grid; place-items: center; background: var(--c); color: #fff; font: 800 21px/1 var(--display); letter-spacing: .03em; }
 .doc-title { display: block; width: 100%; margin: 0; padding: 3px 0; border: none; border-radius: 0; background: none; color: var(--ink); font: 700 40px/1.2 "Inter", sans-serif; letter-spacing: -.02em; outline: none; }
 .doc-sub { color: var(--ink-2); }
-.props { margin: 14px 0 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); display: grid; gap: 1px; }
-.prop { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; min-height: 34px; font-size: 14px; }
-.prop-k { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 6px; border-radius: 4px; color: var(--ink-2); white-space: nowrap; }
-.prop-k span { width: 16px; text-align: center; }
-.prop-v { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; padding: 4px 8px; }
-.prop-v a { text-decoration: underline; text-decoration-color: var(--ink-3); text-underline-offset: 3px; }
 
 .callout { display: flex; gap: 12px; align-items: flex-start; margin: 10px 0; padding: 16px 16px 16px 14px; border-radius: 6px; background: var(--soft); }
 .callout > div { min-width: 0; flex: 1; }
@@ -514,7 +508,6 @@ textarea.letter { min-height: 380px; margin-top: 12px; font: 14px/1.6 "Inter", s
 .inline-link { border: none; background: none; padding: 0; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .doc .doc-hint { margin-top: 20px; color: var(--ink-2); font-size: 15px; }
 .doc .doc-foot { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 13px; }
-.doc .doc-error { color: #d44c47; font-size: 14px; margin-top: 8px; }
 .doc-shimmer { display: grid; gap: 8px; margin-top: 12px; }
 .doc-shimmer i { height: 10px; border-radius: 4px; background: linear-gradient(90deg, var(--line), var(--hover), var(--line)); background-size: 200% 100%; animation: doc-shimmer 1.2s linear infinite; }
 .doc-shimmer i:nth-child(2) { width: 82%; }
@@ -554,54 +547,14 @@ a.src-time:hover { color: var(--blue); text-decoration: none; }
 .doc-table th { text-align: left; font-weight: 500; font-size: 14px; color: var(--ink-2); }
 .doc-table th, .doc-table td { padding: 7px 10px; border: 1px solid var(--line); vertical-align: top; line-height: 1.5; }
 .doc-table td:first-child { width: 30%; font-weight: 600; }
-.doc-links { display: grid; gap: 1px; }
-.doc-link { display: flex; align-items: center; gap: 10px; padding: 5px 6px; border-radius: 4px; color: var(--ink); font-size: 15px; }
-.doc-link:hover { background: var(--hover); text-decoration: none; }
 
-.doc .pill { display: inline-flex; align-items: center; height: 21px; padding: 0 7px; border-radius: 3px; font-size: 13px; font-weight: 400; line-height: 21px; white-space: nowrap; flex: none; }
-.cs-new { background: var(--gray-bg); color: var(--gray-fg); }
-.cs-learning { background: var(--yellow-bg); color: var(--yellow-fg); }
-.cs-understood { background: var(--green-bg); color: var(--green-fg); }
-.doc .pill-select { -webkit-appearance: none; appearance: none; width: auto; height: 22px; padding: 0 8px; border: none; border-radius: 3px; font: 400 13px/22px "Inter", sans-serif; cursor: pointer; flex: none; }
-.doc .pill-select:not([class*="cs-"]) { background: color-mix(in srgb, var(--pill, var(--ink-3)) 18%, transparent); color: var(--ink); }
-.doc .pill-select:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 .bar { display: inline-block; width: 96px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; vertical-align: middle; }
 .bar i { display: block; height: 100%; border-radius: 3px; background: var(--green); }
-
-/* Concepts: a list of toggles, each with how well you understand it */
-.h2-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
-.h2-row .ghost { margin-bottom: 6px; }
-.concepts { border-top: 1px solid var(--line); }
-.concept { border-bottom: 1px solid var(--line); scroll-margin-top: 120px; transition: background .2s; }
-.concept.flash { animation: doc-flash 2.4s ease-out; }
-.concept-row { display: flex; align-items: center; gap: 6px; min-height: 42px; padding: 3px 2px; }
-.caret { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: none; border-radius: 4px; background: none; color: var(--ink-2); font-size: 11px; transition: transform .15s; }
-.caret:hover { background: var(--hover); }
-.concept.open .caret { transform: rotate(90deg); }
-.concept-name { flex: 1; min-width: 0; padding: 4px 2px; border: none; background: none; text-align: left; font: 500 15px "Inter", sans-serif; color: var(--ink); }
-.concept-need { max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--ink-3); }
-.concept-body { padding: 0 8px 16px 30px; }
-.doc .concept-body p { font-size: 15px; }
-.mini-props { display: grid; gap: 6px; margin: 10px 0; font-size: 14px; }
-.mini-props > div { display: flex; gap: 10px; align-items: baseline; }
-.mini-k { flex: none; width: 86px; color: var(--ink-2); }
-.mini-v { display: flex; flex-wrap: wrap; gap: 4px 6px; }
-.chip-link { padding: 1px 6px; border-radius: 4px; background: var(--hover); font-size: 13px; }
-.chip-link:hover { background: var(--sel); text-decoration: none; }
-.mini-h { margin: 14px 0 4px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
-.checks { margin: 0; padding-left: 22px; }
-.doc .checks li { padding: 2px 0; font-size: 15px; }
-.concept-actions { display: flex; align-items: center; gap: 16px; margin-top: 12px; font-size: 14px; }
-.doc .concept-actions a { color: var(--blue); }
-.add-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; color: var(--ink-3); }
-.doc .add-row input { width: 100%; padding: 6px 0; border: none; background: none; font-size: 15px; color: var(--ink); outline: none; }
-.add-row input::placeholder { color: var(--ink-3); }
 
 /* Lists of pages, like a Notion database in list view */
 .db-list { border-top: 1px solid var(--line); margin: 4px 0; }
 .db-row { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 7px 6px; border-bottom: 1px solid var(--line); color: var(--ink); }
 .db-row:hover { background: var(--hover); text-decoration: none; }
-.db-row > .pill { min-width: 86px; justify-content: center; } /* status first: keep the names lined up */
 .db-ico { flex: none; width: 22px; text-align: center; font-size: 16px; }
 .db-main { flex: 1; min-width: 0; display: grid; }
 .db-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; }
@@ -609,6 +562,10 @@ a.src-time:hover { color: var(--blue); text-decoration: none; }
 .db-meta { flex: none; white-space: nowrap; font-size: 13px; color: var(--ink-2); }
 .db-new { display: block; width: 100%; padding: 9px 8px; border: none; border-radius: 0; background: none; text-align: left; font: 400 14px "Inter", sans-serif; color: var(--ink-3); }
 .db-new:hover:not(:disabled) { background: var(--hover); color: var(--ink-2); }
+.doc .db-empty { margin: 0; padding: 12px 8px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--ink-3); }
+.new-err { position: absolute; right: 0; top: calc(100% + 4px); z-index: 46; display: flex; align-items: flex-start; gap: 6px; width: min(360px, calc(100vw - 32px)); padding: 10px 6px 10px 12px; border-radius: 8px; background: var(--panel); color: #d44c47; box-shadow: var(--menu-shadow); font-size: 14px; line-height: 1.45; text-align: left; }
+.notes-list .new-err { left: 0; right: auto; }
+.doc .new-err .ghost { flex: none; padding: 0 6px; font-size: 18px; line-height: 1.2; }
 .g-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 8px 0; }
 .g-card { display: flex; flex-direction: column; overflow: hidden; border-radius: 6px; color: var(--ink); box-shadow: 0 0 0 1px var(--line), 0 2px 4px rgb(15 15 15 / .04); transition: background .12s; }
 .g-card:hover { background: var(--hover); text-decoration: none; }
@@ -617,13 +574,25 @@ a.src-time:hover { color: var(--blue); text-decoration: none; }
 .g-body strong { font-size: 15px; font-weight: 600; }
 .g-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--ink-2); }
 .g-line { font-size: 13px; }
-.g-body .bar { width: 100%; margin: 6px 0 2px; }
 
-/* Your own notes: a borderless text block that grows as you type */
-.mine { position: relative; }
-.doc .mine textarea { display: block; width: 100%; min-height: 56px; padding: 3px 0; border: none; border-radius: 0; background: none; resize: none; overflow: hidden; color: var(--ink); font: 400 16px/1.65 "Inter", sans-serif; outline: none; }
+/* A note: your own writing on a borderless page that grows as you type */
+.mine { position: relative; margin-top: 10px; }
+.doc .mine textarea { display: block; width: 100%; min-height: 168px; padding: 3px 0; border: none; border-radius: 0; background: none; resize: none; overflow: hidden; color: var(--ink); font: 400 16px/1.65 "Inter", sans-serif; outline: none; }
 .mine textarea::placeholder { color: var(--ink-3); }
-.mine-state { position: absolute; right: 0; top: -28px; font-size: 12px; color: var(--ink-3); }
+textarea.doc-title { min-height: 0; resize: none; overflow: hidden; }
+.doc-title::placeholder { color: var(--ink-3); opacity: .6; }
+.note:has(.from-rec) .mine textarea { min-height: 56px; }
+.save-state { padding: 0 8px; font-size: 13px; color: var(--ink-3); white-space: nowrap; }
+.save-state.failed { color: #d44c47; }
+.note-date { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 28px; margin-left: 4px; padding: 0 8px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font: 500 14px "Inter", sans-serif; white-space: nowrap; cursor: pointer; }
+.note-date:hover { background: var(--hover); }
+.note-date:focus-within { box-shadow: inset 0 0 0 1px var(--line), 0 0 0 2px color-mix(in srgb, var(--blue) 35%, transparent); }
+.note-date-ico { color: var(--ink-3); font-size: 13px; }
+/* the real date input sits invisibly on top, so a click opens the browser's own date picker */
+.note-date input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+.from-rec { margin-top: 36px; }
+.rec-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 13px; color: var(--ink-3); }
+.rec-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .paste { display: grid; gap: 8px; margin: 10px 0 0; }
 .doc-wrap .paste textarea { min-height: 110px; border: none; border-radius: 6px; background: var(--soft); color: var(--ink); font: 14px/1.5 "Inter", sans-serif; }
 .paste button { justify-self: start; }
@@ -638,12 +607,7 @@ a.src-time:hover { color: var(--blue); text-decoration: none; }
 .menu-label { padding: 4px 8px 6px; font-size: 12px; color: var(--ink-3); }
 .menu .dot { width: 10px; height: 10px; border-radius: 3px; }
 
-/* Recording: a block to start, then a small floating bar while class goes on */
-.rec-start strong { font-size: 16px; }
-.rec-start-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.rec-go { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border: none; border-radius: 6px; background: var(--red); color: #fff; font: 600 14px "Inter", sans-serif; }
-.rec-go:hover { filter: brightness(.94); }
-.rec-go .rec-dot { background: #fff; }
+/* Recording: a small floating bar while class goes on */
 .rec-dot { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--red); }
 .rec-dot.small { width: 8px; height: 8px; }
 .rec-dot.pulse { animation: doc-rec 1.4s ease-in-out infinite; }
@@ -697,11 +661,12 @@ a.src-time:hover { color: var(--blue); text-decoration: none; }
   .doc-icon { font-size: 48px; }
   .course-icon { width: 56px; height: 56px; font-size: 17px; border-radius: 12px; }
   .doc-title { font-size: 31px; }
-  .prop { grid-template-columns: 124px minmax(0, 1fr); }
   .doc h2 { font-size: 21px; margin-top: 32px; }
-  .concept-need { display: none; }
   .db-row { flex-wrap: wrap; row-gap: 2px; }
   .db-meta { width: 100%; padding-left: 32px; }
+  .note .doc-top { flex-wrap: wrap; row-gap: 6px; }
+  .note .doc-actions { margin-left: auto; }
+  .save-state { display: none; }
   .rec-level, .rec-pill .rec-sub { display: none; }
 }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { writeNotes, type Lecture, type LectureMine } from "@/lib/lectures";
-import { getOne, putOne } from "@/lib/store";
+import { getOne, putOne, saveError } from "@/lib/store";
 
 export const maxDuration = 60;
 
@@ -13,6 +13,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   // Save onto the latest copy, in case more transcript arrived while the notes were written.
   const latest = (await getOne<Lecture>("lectures", id)) ?? lecture;
   latest.notes = notes;
-  await putOne("lectures", id, latest);
+  try {
+    await putOne("lectures", id, latest);
+  } catch (e) {
+    return NextResponse.json({ error: saveError(e) }, { status: 503 });
+  }
   return NextResponse.json(notes);
 }

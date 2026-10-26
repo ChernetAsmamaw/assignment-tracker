@@ -5,10 +5,11 @@ import { cookies } from "next/headers";
 import { COOKIE, authToken } from "@/lib/auth";
 import { getAssignments, isDemo } from "@/lib/canvas";
 import { courseColor } from "@/lib/colors";
+import { canSave, NO_DATABASE } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: "Pace: your AI study team",
-  description: "Agents that plan your week, turn your classes into notes you can trace and help you understand the concepts behind your assignments, from your Quercus courses.",
+  description: "Agents that plan your week, keep your notes for each course and measure what you know, from your Quercus courses.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -30,7 +31,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <Shell spaces={spaces} signOut={!!process.env.APP_PASSWORD} demo={isDemo()}>{children}</Shell>
+        <Shell spaces={spaces} signOut={!!process.env.APP_PASSWORD} demo={isDemo()}>
+          {signedIn && !canSave() && <div className="banner" role="alert">{NO_DATABASE}</div>}
+          {children}
+        </Shell>
       </body>
     </html>
   );

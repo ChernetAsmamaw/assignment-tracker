@@ -33,8 +33,8 @@ export async function POST(req: Request) {
   if (r.agent === "study") {
     const code = assignments.find((a) => a.courseCode.toLowerCase() === r.courseCode.toLowerCase())?.courseCode;
     return code
-      ? NextResponse.json({ agent: "Study", message: `Opening ${code}: its class notes and the concepts its work needs.`, href: studyHref(code) })
-      : NextResponse.json({ agent: "Study", message: "Opening Study. Pick a course to see its notes and concepts.", href: "/study" });
+      ? NextResponse.json({ agent: "Study", message: `Opening your ${code} notes.`, href: studyHref(code) })
+      : NextResponse.json({ agent: "Study", message: "Opening Study. Pick a course to see its notes.", href: "/study" });
   }
   if (r.agent === "quiz") {
     const q = new URLSearchParams({ course: r.courseCode, topic: r.topic });

@@ -14,6 +14,8 @@ Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free t
 | **Planner** | Fits every assignment step and study session into the hours you have each day. Takes plain-English changes to your week. Flags crunch days, missing rest days and deadlines that won't fit, and writes a weekly coaching note. | Deterministic earliest-deadline-first scheduler in Toronto time. Gemini turns your message into per-day hour changes (structured output). |
 | **Study Plan** | Builds a day-by-day timeline to an exam: learn each topic, review it 1, 3 and 7 days later, mixed timed practice, a mock exam two days out, and a light final review. Weakest topics go first. Sessions show up in your planner and the morning email. | Spaced-repetition scheduler. Gemini works out topics from your course if you don't list them and writes concrete activities for each session. |
 | **Performance** | Reads your real Quercus grades per course (average, trend, late and missed work) and your topic mastery, then tells you where to focus. Quizzes you to measure proficiency, and the score feeds back into your study plans. | Gemini writes 5-question quizzes graded in the browser. Mastery is a weighted moving score per topic. Gemini writes insights from the numbers. |
+| **Career agent** (Internships) | Tracks practicum, internship, co-op and conference applications. A list split into **Priority** (starred, soonest deadline first) and **By relevance** (ranked by fit with your background and location). Each opportunity gets a dated application plan (what to prioritize, which parts of your background to lead with, what's easy to miss) and a personalized cover letter. | Gemini structured output over your profile and the posting. Plan steps are dated back from the deadline with a two-day buffer. |
+| **Scout** | Every morning it searches the web for internships, practicums and conferences that fit your profile, and checks the career sites you follow (GFT Technologies by default). New finds land in an inbox and the morning email, and nothing is added until you say so. | Gemini with **Google Search grounding** (free tier, 3 searches a day), run by a Vercel Cron job. Dead links fall back to the search source; expired postings and repeats are dropped. |
 | **Assignment coach** | Breaks any assignment into steps with hour estimates and easy-to-miss requirements, finds resources, and answers questions from the instructor's instructions. | Gemini with JSON schemas over the Quercus description. |
 
 Every agent has a rule-based fallback, so the app works without a key and never shows a blank screen in a demo.
@@ -25,6 +27,12 @@ Every agent has a rule-based fallback, so the app works without a key and never 
 | Planner | Command bar | Phone |
 | --- | --- | --- |
 | ![Planner](docs/planner.png) | ![Command bar](docs/command-bar.png) | ![Mobile](docs/mobile.png) |
+
+## Career agent setup
+
+Open **Internships → Profile & Scout settings** and fill in your program, skills, where you'd go and paste your resume as text. The Scout, fit scores, plans and cover letters all use it. Add any company whose careers page you want checked daily.
+
+The Scout runs at 10:00 UTC (about 6am in Toronto) from `vercel.json`, before the 8am email, and uses the same `CRON_SECRET`. To run it by hand, use **Search now** on the Internships page. Without `GEMINI_API_KEY` the tracker, plans and letter templates still work, but the Scout can't search.
 
 ## Design
 

@@ -3,14 +3,18 @@ import { loadAll } from "@/lib/data";
 import { hasGemini } from "@/lib/gemini";
 import { formatDue } from "@/lib/format";
 import { courseColor } from "@/lib/colors";
+import { clock, type Lecture } from "@/lib/lectures";
+import { listAll } from "@/lib/store";
 import NewPlanForm from "./NewPlanForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudyPage({ searchParams }: { searchParams: Promise<{ course?: string; title?: string; topics?: string }> }) {
   const q = await searchParams;
-  const { assignments, studyPlans } = await loadAll();
+  const [{ assignments, studyPlans }, lectureMap] = await Promise.all([loadAll(), listAll<Lecture>("lectures")]);
+  const lectures = Object.values(lectureMap).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const courses = [...new Set(assignments.map((a) => a.courseCode))].sort();
+  const noteCourses = [...new Set([...courses, ...lectures.map((l) => l.courseCode).filter(Boolean)])].sort();
   const now = Date.now();
   const upcoming = studyPlans.filter((p) => new Date(p.examAt).getTime() > now);
   const past = studyPlans.filter((p) => new Date(p.examAt).getTime() <= now);
@@ -24,6 +28,26 @@ export default async function StudyPage({ searchParams }: { searchParams: Promis
           <p>Tell it the exam and topics. It builds a day-by-day timeline using spaced repetition, active recall and mock exams, and puts the sessions in your planner.</p>
         </div>
       </header>
+
+      <section className="course-notes">
+        {noteCourses.map((code) => {
+          const mine = lectures.filter((l) => l.courseCode === code);
+          const last = mine[0];
+          const exams = upcoming.filter((p) => p.courseCode === code).length;
+          return (
+            <Link key={code} href={`/lectures?course=${encodeURIComponent(code)}`} className="course-tile" style={{ ["--course" as string]: courseColor(code) }}>
+              <strong>{code}</strong>
+              <span className="small">
+                {mine.length ? `${mine.length} class${mine.length === 1 ? "" : "es"} of notes` : "No class notes yet"}
+                {exams > 0 && ` · ${exams} exam${exams === 1 ? "" : "s"} planned`}
+              </span>
+              <span className="muted small course-tile-last">
+                {last ? `Last: ${last.title}${last.duration ? ` (${clock(last.duration)})` : ""}` : "Record a class →"}
+              </span>
+            </Link>
+          );
+        })}
+      </section>
 
       {upcoming.length > 0 && (
         <section style={{ marginBottom: 24 }}>

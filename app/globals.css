@@ -537,3 +537,10 @@ textarea.letter { min-height: 380px; margin-top: 12px; font: 14px/1.6 "Inter", s
 .seg-time:not(:disabled):hover { color: var(--accent); }
 .seg-time:disabled { opacity: 1; cursor: default; }
 .src-quote .seg-time:not(:disabled) { color: var(--accent); }
+
+/* Course tiles on Study plans: each opens that course's class notes */
+.course-notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
+.course-tile { display: grid; gap: 2px; align-content: start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: linear-gradient(135deg, color-mix(in srgb, var(--course) 14%, var(--card)), var(--card) 70%); color: var(--text); border-top: 4px solid var(--course); }
+.course-tile:hover { text-decoration: none; border-color: var(--course); }
+.course-tile strong { font: 800 18px var(--display); letter-spacing: -.01em; }
+.course-tile-last { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

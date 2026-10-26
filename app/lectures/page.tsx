@@ -20,8 +20,8 @@ export default async function LecturesPage({ searchParams }: { searchParams: Pro
     <>
       <header className="page-head">
         <div>
-          <span className="eyebrow">Class recorder</span>
-          <h1>Class notes</h1>
+          <span className="eyebrow">{course ? <Link href="/lectures" style={{ color: "inherit" }}>Class notes</Link> : "Class recorder"}</span>
+          <h1>{course ? `${course} notes` : "Class notes"}</h1>
           <p>Record a class and get a transcript, a summary and notes by topic. Every note comes from something that was said: hover it to see the exact words.</p>
         </div>
       </header>

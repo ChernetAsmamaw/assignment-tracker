@@ -35,6 +35,16 @@ export interface Lecture {
   duration: number; // seconds recorded so far
   segments: Segment[];
   notes: LectureNotes | null;
+  // What you type is stored apart from the lecture (see LectureMine) and merged in when a page loads.
+  myNotes?: string;
+  checked?: string[];
+}
+
+// Your own notes and ticked to-dos live in their own record, so typing during class never
+// overwrites transcript lines that are being saved at the same moment.
+export interface LectureMine {
+  myNotes: string; // steers what the written notes focus on
+  checked: string[]; // to-dos from the notes you've ticked off, by text
 }
 
 export const newLecture = (title: string, courseCode: string): Lecture => ({
@@ -163,10 +173,13 @@ export async function writeNotes(lecture: Lecture): Promise<LectureNotes> {
   if (hasGemini() && segs.length) {
     try {
       const transcript = segs.map((s) => `[${s.id} ${clock(s.start)}] ${s.text}`).join("\n").slice(0, 400_000);
+      const mine = lecture.myNotes?.trim()
+        ? `\n\nThe student's own rough notes from class. Use them to judge what mattered to them and cover those points, but every note still needs transcript sources:\n${lecture.myNotes.trim().slice(0, 6000)}`
+        : "";
       const { data } = await gemini<Omit<LectureNotes, "ai" | "dropped" | "generatedAt" | "segmentCount">>({
         system: NOTE_TAKER,
         prompt:
-          `Class: ${lecture.courseCode || "unknown course"}, "${lecture.title}".\n\nTranscript, one segment per line as [id time] text:\n${transcript}\n\n` +
+          `Class: ${lecture.courseCode || "unknown course"}, "${lecture.title}".\n\nTranscript, one segment per line as [id time] text:\n${transcript}${mine}\n\n` +
           "Write notes from this transcript.\n" +
           "summary: 3 to 5 sentences on what the class covered and the main takeaways.\n" +
           "sections: the topics in the order they came up, each with a short heading and 2 to 8 concise bullets " +

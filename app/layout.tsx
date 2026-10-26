@@ -8,7 +8,7 @@ import { courseColor } from "@/lib/colors";
 
 export const metadata: Metadata = {
   title: "Pace: your AI study team",
-  description: "Agents that plan your week, build exam study timelines and track your proficiency, from your Quercus courses.",
+  description: "Agents that plan your week, turn your classes into notes you can trace and help you understand the concepts behind your assignments, from your Quercus courses.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

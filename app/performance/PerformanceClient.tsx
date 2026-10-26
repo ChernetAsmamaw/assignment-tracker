@@ -114,7 +114,7 @@ export function Quiz({ gemini, courses, topics, initial }: {
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
               <div className="score-ring" style={{ ["--v" as string]: score }}><span>{score}%</span></div>
-              <p style={{ margin: 0 }}>Saved to your mastery for <strong>{topic}</strong>. {score < 60 ? "Review it and try again tomorrow." : score < 80 ? "Getting there. One more review will lock it in." : "Strong. Your study plans will review it less often."}</p>
+              <p style={{ margin: 0 }}>Saved to your mastery for <strong>{topic}</strong>. {score < 60 ? "Review it and try again tomorrow." : score < 80 ? "Getting there. One more review will lock it in." : "Strong. You can mark it understood on your Study page."}</p>
             </div>
           )}
         </div>

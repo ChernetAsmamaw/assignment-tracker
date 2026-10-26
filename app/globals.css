@@ -452,3 +452,32 @@ textarea.letter { min-height: 380px; margin-top: 12px; font: 14px/1.6 "Inter", s
   .career-stats .stat { padding: 10px 12px; }
   .career-stats .stat-big { font-size: 20px; }
 }
+
+/* Courses on the study page and their lecture notes */
+.course-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.course-tile { position: relative; display: grid; gap: 2px; padding: 14px 16px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: linear-gradient(150deg, color-mix(in srgb, var(--c) 14%, var(--card)), var(--card) 65%); color: var(--text); overflow: hidden; transition: transform .12s, border-color .12s; }
+.course-tile::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--c); }
+.course-tile:hover { text-decoration: none; transform: translateY(-1px); border-color: var(--c); }
+.course-tile-code { font: 800 18px var(--display); color: var(--c); letter-spacing: -.01em; }
+.course-tile-name { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.course-tile-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; font-weight: 600; }
+.course-tile-exam { color: var(--c); }
+.course-head { border-left: 4px solid var(--c); padding-left: 14px; }
+.notes-layout { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+.notes-list { display: grid; gap: 6px; position: sticky; top: 16px; }
+.note-row { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; color: var(--text); }
+.note-row:hover { text-decoration: none; background: var(--card); border-color: var(--border); }
+.note-row.on { background: var(--card); border-color: var(--accent); box-shadow: 0 1px 2px rgb(0 0 0 / .05); }
+.note-title { font-weight: 600; font-size: 14px; line-height: 1.3; }
+.note-reader { min-height: 320px; }
+.note-body { line-height: 1.6; overflow-wrap: anywhere; }
+.note-heading { font: 700 22px/1.25 var(--display) !important; margin: 2px 0 0 !important; letter-spacing: -.01em; }
+.note-body h3, .note-body h4 { font: 700 16px var(--display) !important; margin: 18px 0 6px !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--text) !important; }
+.note-body ul { padding-left: 20px; margin: 6px 0; }
+.note-body li { margin: 3px 0; }
+.note-body code { background: var(--accent-soft); border-radius: 4px; padding: 0 4px; }
+.transcript { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.transcript summary { cursor: pointer; font-weight: 600; }
+.transcript p { margin: 8px 0; font-size: 14px; }
+.transcript .who { display: block; font: 700 12px var(--display); color: var(--accent); }
+@media (max-width: 860px) { .notes-layout { grid-template-columns: 1fr; } .notes-list { position: static; } }

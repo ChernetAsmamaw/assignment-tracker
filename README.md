@@ -34,6 +34,13 @@ Open **Internships → Profile & Scout settings** and fill in your program, skil
 
 The Scout runs at 10:00 UTC (about 6am in Toronto) from `vercel.json`, before the 8am email, and uses the same `CRON_SECRET`. To run it by hand, use **Search now** on the Internships page. Without `GEMINI_API_KEY` the tracker, plans and letter templates still work, but the Scout can't search.
 
+## Lecture notes from Granola
+
+The Study plans page starts with a tile for each course. Open one to read that course's lecture notes: the summary, a link back to Granola, and the transcript when there is one.
+
+- **With a Granola API key** (Business or Enterprise plan): in the Granola app, go to Settings → Connectors → API keys, create a key with the *Personal notes* scope and set it as `GRANOLA_API_KEY`. A note belongs to a course when it sits in a Granola folder whose name includes the course code (e.g. `CSC263`), or when its title mentions the code. Notes from the last six months are synced and cached for ten minutes.
+- **Without a key**: on a course page, choose **Add a Granola note** and paste the summary (and the share link if you like). Pasted notes are saved with your other data.
+
 ## Design
 
 The interface borrows from the Arc browser: a translucent sidebar on a soft gradient frame, the main content on a floating rounded panel, courses as coloured **Spaces**, pinned tiles for each agent, and a ⌘K command bar. It works in light and dark mode and on phones.
@@ -60,7 +67,7 @@ Quercus ─▶ canvas.ts ─▶ planner.ts (scheduler, burnout signals) ─▶ T
 2. **Gemini key** (free, no billing needed): [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 3. **Resend**: sign up with the address you want reminders at and create an API key.
 4. **Vercel**: import this repo and add **Upstash for Redis** from the *Storage* tab.
-5. **Environment variables** (tick Production): `CANVAS_TOKEN`, `GEMINI_API_KEY`, `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`. Optional: `GEMINI_MODEL` (default `gemini-flash-latest`), `REMIND_DAYS`, `REMINDER_FROM`, `CANVAS_BASE_URL` (any Canvas school).
+5. **Environment variables** (tick Production): `CANVAS_TOKEN`, `GEMINI_API_KEY`, `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`. Optional: `GEMINI_MODEL` (default `gemini-flash-latest`), `REMIND_DAYS`, `REMINDER_FROM`, `CANVAS_BASE_URL` (any Canvas school), `GRANOLA_API_KEY` (see below).
 6. Redeploy.
 
 ## Local development

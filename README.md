@@ -34,6 +34,10 @@ Open **Internships → Profile & Scout settings** and fill in your program, skil
 
 The Scout runs at 10:00 UTC (about 6am in Toronto) from `vercel.json`, before the 8am email, and uses the same `CRON_SECRET`. To run it by hand, use **Search now** on the Internships page. Without `GEMINI_API_KEY` the tracker, plans and letter templates still work, but the Scout can't search.
 
+## Choosing what Pace tracks
+
+Quercus lists everything in every course, including things you don't need reminders for, like consent forms. Open **Spaces → Choose** in the sidebar (or **Choose courses** on the Assignments page) and untick a whole course or single assignments. Unticked ones drop out of your lists, the Planner, study plans, Today, Performance and the morning email, and nothing changes on Quercus. Each assignment page also has a **Track this assignment** checkbox.
+
 ## Design
 
 The interface borrows from the Arc browser: a translucent sidebar on a soft gradient frame, the main content on a floating rounded panel, courses as coloured **Spaces**, pinned tiles for each agent, and a ⌘K command bar. It works in light and dark mode and on phones.

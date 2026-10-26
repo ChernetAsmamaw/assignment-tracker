@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAssignment } from "@/lib/canvas";
-import { getProgress } from "@/lib/store";
+import { getProgress, getSettings } from "@/lib/store";
 import { countdown, formatDue } from "@/lib/format";
 import { hasGemini } from "@/lib/gemini";
 import Editor from "./Editor";
+import TrackToggle from "./TrackToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ const SUBMISSION_LABEL: Record<string, string> = {
 
 export default async function AssignmentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [a, progress] = await Promise.all([getAssignment(id), getProgress(id)]);
+  const [a, progress, settings] = await Promise.all([getAssignment(id), getProgress(id), getSettings()]);
   if (!a) notFound();
   const c = countdown(a.dueAt);
   const done = a.submitted || progress.status === "done";
@@ -48,6 +49,12 @@ export default async function AssignmentPage({ params }: { params: Promise<{ id:
           {a.submitted && " · Submitted on Quercus"}
           {a.url !== "#" && <> · <a href={a.url} target="_blank" rel="noreferrer">Open in Quercus</a></>}
         </div>
+        <TrackToggle
+          id={a.id}
+          courseCode={a.courseCode}
+          initial={!settings.excludedAssignments.includes(a.id)}
+          courseOff={settings.excludedCourses.includes(a.courseCode)}
+        />
       </header>
       <div className={`next-up ${done ? "is-done" : `u-${c.urgency}`}`} style={{ opacity: 1 }}>
         <span className="muted small">Deadline</span>

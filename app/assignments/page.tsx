@@ -84,6 +84,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
           <h1>Assignments</h1>
           <p>{open.length} open · {done.length} done in the last two weeks and ahead</p>
         </div>
+        <Link href="/courses" className="btn">Choose courses</Link>
       </header>
       {isDemo() && (
         <div className="banner">Showing sample assignments. Add your Quercus token (CANVAS_TOKEN) to load your real ones.</div>

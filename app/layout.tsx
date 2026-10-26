@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import Shell from "@/components/Shell";
 import { cookies } from "next/headers";
 import { COOKIE, authToken } from "@/lib/auth";
-import { getAssignments, isDemo } from "@/lib/canvas";
+import { isDemo } from "@/lib/canvas";
+import { getIncludedAssignments } from "@/lib/data";
 import { courseColor } from "@/lib/colors";
 
 export const metadata: Metadata = {
@@ -15,7 +16,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // The login page shares this layout, so only load courses for a signed-in visitor.
   const pw = process.env.APP_PASSWORD;
   const signedIn = !pw || (await cookies()).get(COOKIE)?.value === (await authToken(pw));
-  const assignments = signedIn ? await getAssignments().catch(() => []) : [];
+  const assignments = signedIn ? await getIncludedAssignments().catch(() => []) : [];
   const codes = [...new Set(assignments.map((a) => a.courseCode))].sort();
   const spaces = codes.map((code) => ({
     code,

@@ -239,7 +239,9 @@ input[type="range"]:disabled { opacity: .5; }
 .pin:hover { text-decoration: none; background: var(--side-on); }
 .pin.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
 .pin .ico { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 14px; color: #fff; }
-.side-label { font: 700 11px var(--display); text-transform: uppercase; letter-spacing: .08em; color: var(--side-muted); padding: 0 8px; margin-bottom: -8px; }
+.side-label { font: 700 11px var(--display); text-transform: uppercase; letter-spacing: .08em; color: var(--side-muted); padding: 0 8px; margin-bottom: -8px; display: flex; justify-content: space-between; align-items: baseline; }
+.side-label a { font: 600 11px var(--display); letter-spacing: 0; text-transform: none; color: var(--side-muted); padding: 1px 7px; border-radius: 6px; }
+.side-label a:hover, .side-label a.on { text-decoration: none; color: var(--side-text); background: var(--side-hover); }
 .tabs { display: grid; gap: 2px; }
 .tab { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; color: var(--side-text); font-size: 14px; font-weight: 500; }
 .tab:hover { text-decoration: none; background: var(--side-hover); }
@@ -451,4 +453,51 @@ textarea.letter { min-height: 380px; margin-top: 12px; font: 14px/1.6 "Inter", s
   .career-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
   .career-stats .stat { padding: 10px 12px; }
   .career-stats .stat-big { font-size: 20px; }
+}
+
+/* Courses: choose what Pace tracks */
+.check { width: 18px; height: 18px; flex: none; margin: 0; padding: 0; accent-color: var(--accent); cursor: pointer; }
+.check:disabled { cursor: not-allowed; }
+.picker-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.picker-bar input { max-width: 420px; }
+.course-pick { padding: 0; overflow: hidden; border-left: 4px solid var(--course); transition: opacity .12s; }
+.course-pick .cp-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.course-pick .dot { width: 10px; height: 10px; border-radius: 4px; flex: none; background: var(--course); }
+.cp-name { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; text-align: left; border: none; background: none; padding: 0; font-weight: 400; color: var(--text); }
+.cp-name strong { font-family: var(--display); font-size: 16px; white-space: nowrap; }
+.cp-name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-count { white-space: nowrap; }
+button.cp-toggle { color: var(--accent); white-space: nowrap; }
+.course-pick.off { background: var(--bg); border-left-color: var(--border); }
+.course-pick.off .cp-name, .course-pick.off .dot { opacity: .5; }
+.cp-body { border-top: 1px solid var(--border); padding: 4px 16px 10px 46px; }
+.cp-note { margin: 8px 0 2px; }
+.cp-note button.link { color: var(--accent); }
+.cp-list { list-style: none; margin: 0; padding: 0; }
+.cp-list label { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 0; border-top: 1px solid var(--border); color: var(--text); font-size: 14px; cursor: pointer; }
+.cp-list li:first-child label { border-top: none; }
+.cp-list .a-name { flex: 1; min-width: 0; }
+.cp-list .a-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.cp-list li.off .a-name { color: var(--muted); }
+.cp-list.disabled label { cursor: not-allowed; opacity: .55; }
+.cp-past { margin-top: 4px; }
+.cp-past summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; padding: 8px 0; border-top: 1px solid var(--border); }
+.cp-past summary::-webkit-details-marker { display: none; }
+.cp-past summary::before { content: "▸"; }
+.cp-past[open] summary::before { content: "▾"; }
+.cp-past summary .count { background: var(--border); color: var(--text); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+.track { margin-top: 10px; }
+.track label { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--text); font-size: 13px; cursor: pointer; }
+.track label > span { display: grid; gap: 1px; }
+.track .check { margin-top: 2px; }
+.track.off { padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); }
+.track.off label { font-size: 14px; }
+@media (max-width: 600px) {
+  .course-pick .cp-head { flex-wrap: wrap; row-gap: 4px; }
+  .cp-name { flex-basis: calc(100% - 60px); flex-direction: column; gap: 0; }
+  .cp-count { margin-left: 30px; }
+  .cp-toggle { margin-left: auto; }
+  .cp-body { padding-left: 16px; }
+  .cp-list label { flex-wrap: wrap; row-gap: 0; }
+  .cp-list .a-meta { width: 100%; padding-left: 28px; white-space: normal; }
 }

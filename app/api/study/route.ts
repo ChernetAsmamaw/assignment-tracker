@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createStudyPlan } from "@/lib/agents/study";
-import { getAssignments } from "@/lib/canvas";
+import { getIncludedAssignments } from "@/lib/data";
 import { listAll, putOne } from "@/lib/store";
 import type { Mastery } from "@/lib/types";
 
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   }
   const topics = Array.isArray(b.topics) ? b.topics : String(b.topics ?? "").split(/[,\n]/);
   const courseCode = String(b.courseCode ?? "").trim();
-  const [assignments, mastery] = await Promise.all([getAssignments(), listAll<Mastery>("mastery")]);
+  const [assignments, mastery] = await Promise.all([getIncludedAssignments(), listAll<Mastery>("mastery")]);
   const plan = await createStudyPlan(
     { title: String(b.title ?? "Exam"), courseCode, examAt: examAt.toISOString(), topics, notes: String(b.notes ?? "") },
     assignments.filter((a) => a.courseCode === courseCode),

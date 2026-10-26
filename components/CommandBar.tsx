@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 const EXAMPLES = [
   "I work Tuesday 5 to 10pm and have nothing planned Sunday",
+  "I only slept 4 hours and I'm wiped",
   "What do I need to understand for my CSC263 project?",
   "Quiz me on titration error analysis",
   "Open my lab report",

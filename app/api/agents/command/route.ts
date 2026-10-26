@@ -5,6 +5,7 @@ import { loadAll } from "@/lib/data";
 import { fmtHours, PRESSURE_LABEL } from "@/lib/planner";
 import { getSettings, saveSettings } from "@/lib/store";
 import { studyHref } from "@/lib/study";
+import { recordCheckIn } from "@/lib/agents/wellbeing";
 
 export const maxDuration = 60;
 
@@ -24,6 +25,10 @@ export async function POST(req: Request) {
     const result = await applyInstruction(r.instruction, await getSettings());
     await saveSettings(result.settings);
     return NextResponse.json({ agent: "Planner", message: result.reply, href: "/plan" });
+  }
+  if (r.agent === "checkin") {
+    const { checkin, capacity } = await recordCheckIn(r);
+    return NextResponse.json({ agent: "Wellbeing", message: `${checkin.reply} Today is now ${fmtHours(capacity)}.`, href: "/" });
   }
   if (r.agent === "study") {
     const code = assignments.find((a) => a.courseCode.toLowerCase() === r.courseCode.toLowerCase())?.courseCode;

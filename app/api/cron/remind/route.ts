@@ -12,9 +12,9 @@ export async function GET(req: Request) {
   }
   try {
     if (new URL(req.url).searchParams.get("preview")) {
-      const { pending, progress, days } = await buildReminder();
-      if (!pending.length) return NextResponse.json({ pending: 0 });
-      return new NextResponse(renderEmail(pending, progress, days).html, {
+      const { pending, progress, days, plan } = await buildReminder();
+      if (!pending.length && !plan.days[0].items.length) return NextResponse.json({ pending: 0 });
+      return new NextResponse(renderEmail(pending, progress, days, plan).html, {
         headers: { "content-type": "text/html" },
       });
     }

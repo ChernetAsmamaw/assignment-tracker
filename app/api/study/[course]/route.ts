@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAssignments } from "@/lib/canvas";
+import { getIncludedAssignments } from "@/lib/data";
 import type { Lecture } from "@/lib/lectures";
 import { getOne, listAll, putOne } from "@/lib/store";
 import { conceptKey, courseFromParam, emptyStudy, newConcept, traceConcept, type ConceptStatus, type CourseStudy } from "@/lib/study";
@@ -15,7 +15,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ course: 
   // A concept you add is traced to the classes that mention it and the work that needs it.
   let traced: ReturnType<typeof traceConcept> | null = null;
   if (name) {
-    const [lectures, assignments] = await Promise.all([listAll<Lecture>("lectures"), getAssignments()]);
+    const [lectures, assignments] = await Promise.all([listAll<Lecture>("lectures"), getIncludedAssignments()]);
     const mine = Object.values(lectures).filter((l) => l.courseCode === code).sort((x, y) => x.createdAt.localeCompare(y.createdAt));
     traced = traceConcept(name, mine, assignments.filter((a) => a.courseCode === code && !a.submitted));
   }

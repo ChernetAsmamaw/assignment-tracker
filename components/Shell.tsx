@@ -79,7 +79,7 @@ export default function Shell({ spaces, signOut, demo, children }: { spaces: Spa
             </Link>
           ))}
         </nav>
-        <div className="side-label">Spaces</div>
+        <div className="side-label">Spaces <Link href="/courses" className={path === "/courses" ? "on" : ""}>Choose</Link></div>
         <Suspense fallback={null}><Spaces spaces={spaces} /></Suspense>
         <div className="side-foot">
           <span>{demo ? "Sample data" : "Synced with Quercus"}</span>

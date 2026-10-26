@@ -12,8 +12,10 @@ import NewClass from "./NewClass";
 export const dynamic = "force-dynamic";
 
 export default async function StudyPage() {
-  const [{ assignments, progress, studies }, all] = await Promise.all([loadAll(), listAll<Lecture>("lectures")]);
-  const lectures = Object.values(all).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const [{ assignments, progress, studies, settings }, all] = await Promise.all([loadAll(), listAll<Lecture>("lectures")]);
+  const lectures = Object.values(all)
+    .filter((l) => !settings.excludedCourses.includes(l.courseCode))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const open = assignments.filter((a) => isOpen(a, progress[a.id]));
   const codes = [...new Set([...assignments.map((a) => a.courseCode), ...lectures.map((l) => l.courseCode), ...studies.map((s) => s.courseCode)])].filter(Boolean).sort();
   const studyBy = new Map(studies.map((s) => [s.courseCode, s]));

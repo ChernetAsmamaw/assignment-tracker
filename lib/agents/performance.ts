@@ -1,5 +1,6 @@
 import { gemini, hasGemini, plainText } from "../gemini";
-import type { Assignment, Mastery, Progress, StudyPlan } from "../types";
+import type { CourseStudy } from "../study";
+import { masteryKey, type Assignment, type Mastery, type Progress } from "../types";
 
 // Performance agent: reads real Quercus grades and the student's topic mastery,
 // finds where they're slipping, and quizzes them to measure and build proficiency.
@@ -166,12 +167,12 @@ export function updateMastery(prev: Mastery | null, courseCode: string, topic: s
   };
 }
 
-export const topicsFor = (plans: StudyPlan[], mastery: Mastery[]) => {
+export const topicsFor = (studies: CourseStudy[], mastery: Mastery[]) => {
   const seen = new Map<string, { courseCode: string; topic: string }>();
   for (const m of mastery) seen.set(m.key, { courseCode: m.courseCode, topic: m.topic });
-  for (const p of plans) for (const t of p.topics) {
-    const k = `${p.courseCode}::${t.trim().toLowerCase()}`;
-    if (!seen.has(k)) seen.set(k, { courseCode: p.courseCode, topic: t });
+  for (const s of studies) for (const c of s.concepts) {
+    const k = masteryKey(s.courseCode, c.name);
+    if (!seen.has(k)) seen.set(k, { courseCode: s.courseCode, topic: c.name });
   }
   return [...seen.values()];
 };

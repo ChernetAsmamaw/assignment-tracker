@@ -34,9 +34,9 @@ export default function TrackToggle({ id, courseCode, initial, courseOff }: { id
             {courseOff ? (
               <>{courseCode} is unticked, so Pace leaves all of it out. <Link href="/courses">Choose courses</Link></>
             ) : on ? (
-              "Shows up in your lists, planner, study plans and the morning email."
+              "Shows up in your lists, planner, Study page and the morning email."
             ) : (
-              "Left out of your lists, planner, study plans and the morning email."
+              "Left out of your lists, planner, Study page and the morning email."
             )}
           </span>
         </span>

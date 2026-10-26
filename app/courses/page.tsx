@@ -25,7 +25,7 @@ export default async function CoursesPage() {
         <div>
           <span className="eyebrow">Courses</span>
           <h1>Choose what Pace tracks</h1>
-          <p>Untick a course or an assignment to leave it out of your lists, planner, study plans, Today and the morning email. Nothing changes on Quercus, and you can tick it again any time.</p>
+          <p>Untick a course or an assignment to leave it out of your lists, planner, Study, Today and the morning email. Nothing changes on Quercus, and you can tick it again any time.</p>
         </div>
       </header>
       {isDemo() && <div className="banner">Showing sample courses. Add your Quercus token (CANVAS_TOKEN) to choose from yours.</div>}

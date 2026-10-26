@@ -7,13 +7,14 @@ import { countdown, formatDue } from "@/lib/format";
 import { fmtHours, isOpen, PRESSURE_LABEL } from "@/lib/planner";
 import { listOpportunities } from "@/lib/careers-store";
 import { deadlineInfo, isToApply, sortPriority, torontoToday } from "@/lib/careers";
+import { focusList, studyHref } from "@/lib/study";
 
 export const dynamic = "force-dynamic";
 
 const TZ = "America/Toronto";
 
 export default async function Today() {
-  const [{ assignments, progress, plan, studyPlans, mastery }, opps] = await Promise.all([loadAll(), listOpportunities()]);
+  const [{ assignments, progress, plan, studies, mastery }, opps] = await Promise.all([loadAll(), listOpportunities()]);
   const now = new Date();
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" }).format(now));
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -23,8 +24,9 @@ export default async function Today() {
     .filter((a) => isOpen(a, progress[a.id]) && a.dueAt && new Date(a.dueAt).getTime() > now.getTime())
     .slice(0, 5);
   const next = upcoming[0];
-  const nextExam = studyPlans.find((p) => new Date(p.examAt).getTime() > now.getTime());
-  const examDays = nextExam ? Math.ceil((new Date(nextExam.examAt).getTime() - now.getTime()) / 864e5) : 0;
+  const focus = focusList(studies, assignments.filter((a) => isOpen(a, progress[a.id])));
+  const nextConcept = focus[0];
+  const conceptCount = studies.reduce((n, s) => n + s.concepts.length, 0);
   const stats = courseStats(assignments, progress).filter((s) => s.average != null);
   const pts = assignments.filter((a) => a.score != null && a.points);
   const overall = pts.length ? Math.round((pts.reduce((n, a) => n + a.score!, 0) / pts.reduce((n, a) => n + a.points!, 0)) * 100) : null;
@@ -59,11 +61,15 @@ export default async function Today() {
           <span className="big">{PRESSURE_LABEL[plan.pressure]}</span>
           <span className="small">{fmtHours(plan.next7Hours)} of {fmtHours(plan.next7Capacity)} this week{plan.risks.length ? ` · ${plan.risks.length} at risk` : ""}</span>
         </Link>
-        <Link href={nextExam ? `/study/${nextExam.id}` : "/study"} className="agent g-study">
+        <Link href={nextConcept ? `${studyHref(nextConcept.courseCode)}#${nextConcept.concept.id}` : "/study"} className="agent g-study">
           <span className="ico">✎</span>
-          <span className="muted small">Study Plan agent</span>
-          <span className="big">{nextExam ? `${examDays} day${examDays === 1 ? "" : "s"}` : "No exams yet"}</span>
-          <span className="small">{nextExam ? `until ${nextExam.courseCode} ${nextExam.title} · ${nextExam.sessions.filter((s) => s.done).length}/${nextExam.sessions.length} sessions done` : "Build a timeline for your next exam"}</span>
+          <span className="muted small">Study</span>
+          <span className="big">{focus.length ? `${focus.length} to understand` : conceptCount ? "All understood" : "Your classes"}</span>
+          <span className="small">
+            {nextConcept
+              ? `Next: ${nextConcept.concept.name}${nextConcept.assignment ? ` for ${nextConcept.assignment.name}` : ""}`
+              : "Record a class to build your notes and concepts"}
+          </span>
         </Link>
         <Link href="/performance" className="agent g-perf">
           <span className="ico">↗</span>

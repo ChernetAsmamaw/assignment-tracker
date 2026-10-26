@@ -1,6 +1,6 @@
 # Pace: your AI study team
 
-Pace connects to Quercus (UofT's Canvas) and gives every student a small team of **AI agents, powered by Google Gemini**. They plan your week around your real life, build exam study timelines grounded in learning science, and measure how well you actually know each topic. Deadlines are only the starting point.
+Pace connects to Quercus (UofT's Canvas) and gives every student a small team of **AI agents, powered by Google Gemini**. They plan your week around your real life, record your classes into notes you can trace back to the lecture, help you understand the concepts your projects and assignments depend on, and measure how well you actually know each topic. Deadlines are only the starting point.
 
 Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free tier, Vercel Hobby, Upstash free and Resend free.
 
@@ -10,23 +10,36 @@ Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free t
 
 | Agent | What it does | How |
 | --- | --- | --- |
-| **Command bar** (⌘K) | One box for everything: "I work Tuesday 5 to 10", "Midterm in CSC263 on the 28th", "Quiz me on heaps". | Gemini **function calling** picks the right agent and extracts its arguments, then the app runs it. |
-| **Planner** | Fits every assignment step and study session into the hours you have each day. Takes plain-English changes to your week. Flags crunch days, missing rest days and deadlines that won't fit, and writes a weekly coaching note. | Deterministic earliest-deadline-first scheduler in Toronto time. Gemini turns your message into per-day hour changes (structured output). |
-| **Study Plan** | Builds a day-by-day timeline to an exam: learn each topic, review it 1, 3 and 7 days later, mixed timed practice, a mock exam two days out, and a light final review. Weakest topics go first. Sessions show up in your planner and the morning email. | Spaced-repetition scheduler. Gemini works out topics from your course if you don't list them and writes concrete activities for each session. |
-| **Performance** | Reads your real Quercus grades per course (average, trend, late and missed work) and your topic mastery, then tells you where to focus. Quizzes you to measure proficiency, and the score feeds back into your study plans. | Gemini writes 5-question quizzes graded in the browser. Mastery is a weighted moving score per topic. Gemini writes insights from the numbers. |
+| **Command bar** (⌘K) | One box for everything: "I work Tuesday 5 to 10", "Open my CSC263 notes", "Quiz me on heaps". | Gemini **function calling** picks the right agent and extracts its arguments, then the app runs it. |
+| **Planner** | Fits every assignment step, plus time to understand the concepts it needs, into the hours you have each day. Takes plain-English changes to your week. Flags crunch days, missing rest days and deadlines that won't fit, and writes a weekly coaching note. | Deterministic earliest-deadline-first scheduler in Toronto time. Gemini turns your message into per-day hour changes (structured output). |
+| **Study** | One page per course, laid out like a Notion doc: the concepts its projects and assignments depend on, each explained from your class notes, linked to the class and the exact transcript lines it was taught in, the work that needs it, and questions that check you can explain and apply it. Mark each one Not yet, Learning or Understood. Anything not understood becomes a short "Understand ..." block in the planner before the soonest work that needs it, and in the morning email. | Gemini structured output over your class notes (by reference, so every explanation keeps its sources) and the open assignment descriptions. Explanations with no valid note behind them are dropped. Without a key, concepts you add are traced to the class lines that mention them. |
+| **Performance** | Reads your real Quercus grades per course (average, trend, late and missed work) and your topic mastery, then tells you where to focus. Quizzes you on your courses' concepts to measure proficiency. | Gemini writes 5-question quizzes graded in the browser. Mastery is a weighted moving score per topic. Gemini writes insights from the numbers. |
 | **Career agent** (Internships) | Tracks practicum, internship, co-op and conference applications. A list split into **Priority** (starred, soonest deadline first) and **By relevance** (ranked by fit with your background and location). Each opportunity gets a dated application plan (what to prioritize, which parts of your background to lead with, what's easy to miss) and a personalized cover letter. | Gemini structured output over your profile and the posting. Plan steps are dated back from the deadline with a two-day buffer. |
 | **Scout** | Every morning it searches the web for internships, practicums and conferences that fit your profile, and checks the career sites you follow (GFT Technologies by default). New finds land in an inbox and the morning email, and nothing is added until you say so. | Gemini with **Google Search grounding** (free tier, 3 searches a day), run by a Vercel Cron job. Dead links fall back to the search source; expired postings and repeats are dropped. |
 | **Assignment coach** | Breaks any assignment into steps with hour estimates and easy-to-miss requirements, finds resources, and answers questions from the instructor's instructions. | Gemini with JSON schemas over the Quercus description. |
 
 Every agent has a rule-based fallback, so the app works without a key and never shows a blank screen in a demo.
 
-| Study plan timeline | Performance and quiz |
+| Study: a course and its concepts | Performance and quiz |
 | --- | --- |
-| ![Study plan](docs/study-plan.png) | ![Performance](docs/performance.png) |
+| ![Study](docs/study.png) | ![Performance](docs/performance.png) |
 
 | Planner | Command bar | Phone |
 | --- | --- | --- |
 | ![Planner](docs/planner.png) | ![Command bar](docs/command-bar.png) | ![Mobile](docs/mobile.png) |
+
+## Class notes
+
+Class notes live inside each course in **Study**. **Record a class** uses your laptop or phone mic and turns the class into a transcript, a summary, notes by topic, key terms and a to-do list of what you were told to do. Notes are written only from the transcript: every line keeps the transcript segments it came from, and hovering (or tapping) it shows the exact words, highlights them in the transcript side panel and can play the audio from that moment. Lines Gemini returns without a valid source are dropped, and the page says how many.
+
+- While it records, type your own notes on the page. They save as you type and tell Gemini what mattered to you, but every written note still needs a transcript source.
+- When the notes are written, the course's concepts update in the background, and the class page lists the concepts it taught.
+
+- Audio is cut into one-minute 16 kHz WAV chunks; each is uploaded and transcribed by Gemini while the class is still going, so a long lecture never hits upload limits and a dropped connection only retries that minute.
+- The audio itself stays in your browser (IndexedDB) for playback; only the transcript and notes are saved to Redis.
+- Without `GEMINI_API_KEY` it uses the browser's live captions (Chrome, Edge, Safari) for the transcript and picks the strongest sentences as notes, each still linked to its source. You can also paste a transcript.
+
+![Class notes](docs/class-notes.png)
 
 ## Career agent setup
 
@@ -36,7 +49,7 @@ The Scout runs at 10:00 UTC (about 6am in Toronto) from `vercel.json`, before th
 
 ## Choosing what Pace tracks
 
-Quercus lists everything in every course, including things you don't need reminders for, like consent forms. Open **Spaces → Choose** in the sidebar (or **Choose courses** on the Assignments page) and untick a whole course or single assignments. Unticked ones drop out of your lists, the Planner, study plans, Today, Performance and the morning email, and nothing changes on Quercus. Each assignment page also has a **Track this assignment** checkbox.
+Quercus lists everything in every course, including things you don't need reminders for, like consent forms. Open **Spaces → Choose** in the sidebar (or **Choose courses** on the Assignments page) and untick a whole course or single assignments. Unticked ones drop out of your lists, the Planner, Study, Today, Performance and the morning email, and nothing changes on Quercus. Each assignment page also has a **Track this assignment** checkbox.
 
 ## Design
 
@@ -47,15 +60,15 @@ The interface borrows from the Arc browser: a translucent sidebar on a soft grad
 - **Next.js 15** (App Router, React 19, TypeScript) on **Vercel**, with Vercel Cron for the 8am email
 - **Google Gemini API** (`gemini-flash-latest`, free tier) over REST: structured JSON output and function calling
 - **Canvas LMS REST API** for Quercus assignments, instructions, submissions and grades
-- **Upstash Redis** for progress, steps, study plans, mastery, settings and an AI answer cache
+- **Upstash Redis** for progress, steps, class notes, concepts, mastery, settings and an AI answer cache
 - **Resend** for email, `sanitize-html` for instructor HTML
 
 ```
 Quercus ─▶ canvas.ts ─▶ planner.ts (scheduler, burnout signals) ─▶ Today · Planner · email
                 │              ▲            ▲
-                ▼              │            │ study sessions
-        agents/* ─▶ Gemini     │ steps      └── agents/study.ts (spaced repetition)
-   router · planner · study · performance · ai.ts (assignment coach)
+                ▼              │            │ "understand ..." blocks
+        agents/* ─▶ Gemini     │ steps      └── study.ts (concepts) ◀── lectures.ts (class notes)
+   router · planner · performance · ai.ts (assignment coach)
 ```
 
 ## Setup

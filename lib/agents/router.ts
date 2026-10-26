@@ -7,7 +7,7 @@ import type { Assignment } from "../types";
 
 export type Route =
   | { agent: "planner"; instruction: string }
-  | { agent: "study"; courseCode: string; title: string; examDate: string; topics: string[] }
+  | { agent: "study"; courseCode: string }
   | { agent: "quiz"; courseCode: string; topic: string }
   | { agent: "open"; assignmentId: string }
   | { agent: "answer"; text: string };
@@ -19,17 +19,13 @@ const FUNCTIONS = [
     parameters: { type: "OBJECT", properties: { instruction: { type: "STRING" } }, required: ["instruction"] },
   },
   {
-    name: "create_study_plan",
-    description: "Make a study timeline for an upcoming exam, midterm, test or quiz.",
+    name: "open_study",
+    description:
+      "The student wants a course's class notes or recordings, the concepts they need to understand for its assignments and projects, or to study a course.",
     parameters: {
       type: "OBJECT",
-      properties: {
-        courseCode: { type: "STRING", description: "One of the student's course codes" },
-        title: { type: "STRING", description: "e.g. Midterm 2" },
-        examDate: { type: "STRING", description: "YYYY-MM-DD" },
-        topics: { type: "ARRAY", items: { type: "STRING" } },
-      },
-      required: ["courseCode", "title", "examDate"],
+      properties: { courseCode: { type: "STRING", description: "One of the student's course codes" } },
+      required: ["courseCode"],
     },
   },
   {
@@ -62,8 +58,7 @@ export async function route(text: string, assignments: Assignment[], context = "
       if (call) {
         const a = call.args as Record<string, unknown>;
         if (call.name === "change_schedule") return { agent: "planner", instruction: String(a.instruction ?? text) };
-        if (call.name === "create_study_plan")
-          return { agent: "study", courseCode: String(a.courseCode ?? courses[0] ?? ""), title: String(a.title ?? "Exam"), examDate: String(a.examDate ?? ""), topics: (a.topics as string[]) ?? [] };
+        if (call.name === "open_study") return { agent: "study", courseCode: String(a.courseCode ?? "") };
         if (call.name === "quiz_me") return { agent: "quiz", courseCode: String(a.courseCode ?? ""), topic: String(a.topic ?? "") };
         if (call.name === "open_assignment" && assignments.some((x) => x.id === a.assignmentId)) return { agent: "open", assignmentId: String(a.assignmentId) };
       }
@@ -78,10 +73,10 @@ export async function route(text: string, assignments: Assignment[], context = "
 function keywordRoute(text: string, assignments: Assignment[], courses: string[]): Route {
   const t = text.toLowerCase();
   const course = courses.find((c) => t.includes(c.toLowerCase())) ?? "";
-  if (/\b(exam|midterm|final|test)\b/.test(t)) return { agent: "study", courseCode: course || courses[0] || "", title: "Exam", examDate: "", topics: [] };
+  if (/\b(notes?|lectures?|concepts?|understand)\b/.test(t)) return { agent: "study", courseCode: course };
   if (/\b(quiz me|practice|test me)\b/.test(t)) return { agent: "quiz", courseCode: course, topic: "" };
   if (/\b(busy|shift|work|off|free|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow)\b/.test(t)) return { agent: "planner", instruction: text };
   const hit = assignments.find((a) => t.includes(a.name.toLowerCase()) || a.name.toLowerCase().split(/\s+/).filter((w) => w.length > 3).some((w) => t.includes(w)));
   if (hit) return { agent: "open", assignmentId: hit.id };
-  return { agent: "answer", text: "Try \"I work Tuesday 5 to 10\", \"Midterm in CSC263 on the 28th\", or \"Quiz me on heaps\"." };
+  return { agent: "answer", text: "Try \"I work Tuesday 5 to 10\", \"Open my CSC263 notes\", or \"Quiz me on heaps\"." };
 }

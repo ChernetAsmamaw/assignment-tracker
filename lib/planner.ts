@@ -1,5 +1,6 @@
 import type { Settings } from "./store";
-import type { Assignment, Progress, StudyPlan } from "./types";
+import type { StudyTask } from "./study";
+import type { Assignment, Progress } from "./types";
 
 // Turns open assignments into a day-by-day work plan that respects how many
 // hours a day you can study, and flags days and deadlines that won't fit.
@@ -9,9 +10,9 @@ const DAY = 24 * 60 * 60 * 1000;
 const HORIZON_DAYS = 21;
 
 export interface PlanItem {
-  kind: "assignment" | "study";
+  kind: "assignment" | "study"; // study: understanding a concept the assignment needs
   href: string;
-  assignmentId: string; // assignment id, or study plan id for study sessions
+  assignmentId: string;
   name: string;
   courseCode: string;
   title: string;
@@ -80,7 +81,7 @@ export function buildPlan(
   assignments: Assignment[],
   progress: Record<string, Progress>,
   settings: Settings,
-  studyPlans: StudyPlan[] = [],
+  study: Record<string, StudyTask[]> = {}, // concepts each assignment still needs, by assignment id
   now = new Date(),
 ): Plan {
   const days: PlanDay[] = [];
@@ -95,25 +96,6 @@ export function buildPlan(
     days.push({ key, label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayLabel(d), weekend, capacity, note: override?.reason ?? "", load: 0, items: [] });
   }
   const lastKey = days[days.length - 1].key;
-
-  // Exam study sessions are fixed appointments: they take their day's time first.
-  for (const sp of studyPlans) {
-    for (const s of sp.sessions) {
-      const day = days.find((d) => d.key === s.date);
-      if (!day || s.done) continue;
-      day.load = round(day.load + s.minutes / 60);
-      day.items.push({
-        kind: "study",
-        href: `/study/${sp.id}`,
-        assignmentId: sp.id,
-        name: sp.title,
-        courseCode: sp.courseCode,
-        title: `${KIND_LABEL[s.kind]}: ${s.topics.join(", ")}`,
-        hours: round(s.minutes / 60),
-        dueAt: sp.examAt,
-      });
-    }
-  }
 
   let guessed = 0;
   const open = assignments
@@ -130,9 +112,13 @@ export function buildPlan(
     if (hourIn(due) < 12) lastIdx -= 1;
     if (overdue || lastIdx < 0) lastIdx = 0;
 
-    const tasks = p.steps.length
-      ? p.steps.filter((s) => !s.done).map((s) => ({ title: s.title, hours: s.hours }))
-      : [{ title: "Keep working", hours: (p.estimateHours ?? guessHours(a)) * (1 - p.percent / 100) }];
+    // Understanding the concepts comes first, then the work itself.
+    const tasks: { title: string; hours: number; href?: string }[] = [
+      ...(study[a.id] ?? []),
+      ...(p.steps.length
+        ? p.steps.filter((s) => !s.done).map((s) => ({ title: s.title, hours: s.hours }))
+        : [{ title: "Keep working", hours: (p.estimateHours ?? guessHours(a)) * (1 - p.percent / 100) }]),
+    ];
     if (!p.steps.length && p.estimateHours == null) guessed++;
 
     let overflow = 0;
@@ -142,12 +128,12 @@ export function buildPlan(
         const free = round(days[i].capacity - days[i].load);
         if (free < 0.25) continue;
         const take = Math.min(left, free);
-        place(days[i], a, t.title, take);
+        place(days[i], a, t.title, take, t.href);
         left = round(left - take);
       }
       if (left > 0) {
         // Doesn't fit before the deadline: put it on the last possible day and flag it.
-        place(days[lastIdx], a, t.title, left);
+        place(days[lastIdx], a, t.title, left, t.href);
         overflow += left;
       }
     }
@@ -177,14 +163,22 @@ export function buildPlan(
   };
 }
 
-function place(day: PlanDay, a: Assignment, title: string, hours: number) {
+function place(day: PlanDay, a: Assignment, title: string, hours: number, studyHref?: string) {
   day.load = round(day.load + hours);
   const same = day.items.find((it) => it.assignmentId === a.id && it.title === title);
   if (same) same.hours = round(same.hours + hours);
-  else day.items.push({ kind: "assignment", href: `/a/${a.id}`, assignmentId: a.id, name: a.name, courseCode: a.courseCode, title, hours, dueAt: a.dueAt });
+  else
+    day.items.push({
+      kind: studyHref ? "study" : "assignment",
+      href: studyHref ?? `/a/${a.id}`,
+      assignmentId: a.id,
+      name: a.name,
+      courseCode: a.courseCode,
+      title,
+      hours,
+      dueAt: a.dueAt,
+    });
 }
-
-export const KIND_LABEL = { learn: "Learn", review: "Review", practice: "Practice", mock: "Mock exam" } as const;
 
 export const PRESSURE_LABEL: Record<Pressure, string> = {
   calm: "Calm week",

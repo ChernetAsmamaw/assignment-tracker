@@ -28,6 +28,16 @@ Every agent has a rule-based fallback, so the app works without a key and never 
 | --- | --- | --- |
 | ![Planner](docs/planner.png) | ![Command bar](docs/command-bar.png) | ![Mobile](docs/mobile.png) |
 
+## Class recorder
+
+**Class notes** in the sidebar records a class from your laptop or phone mic and turns it into a transcript, a summary, notes by topic, key terms and a list of things you were told to do. Notes are written only from the transcript: every line keeps the transcript segments it came from, and hovering (or tapping) it shows the exact words, highlights them in the transcript and can play the audio from that moment. Lines Gemini returns without a valid source are dropped, and the page says how many.
+
+- Audio is cut into one-minute 16 kHz WAV chunks; each is uploaded and transcribed by Gemini while the class is still going, so a long lecture never hits upload limits and a dropped connection only retries that minute.
+- The audio itself stays in your browser (IndexedDB) for playback; only the transcript and notes are saved to Redis.
+- Without `GEMINI_API_KEY` it uses the browser's live captions (Chrome, Edge, Safari) for the transcript and picks the strongest sentences as notes, each still linked to its source. You can also paste a transcript.
+
+![Class notes](docs/class-notes.png)
+
 ## Career agent setup
 
 Open **Internships → Profile & Scout settings** and fill in your program, skills, where you'd go and paste your resume as text. The Scout, fit scores, plans and cover letters all use it. Add any company whose careers page you want checked daily.

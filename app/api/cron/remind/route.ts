@@ -12,10 +12,10 @@ export async function GET(req: Request) {
   }
   try {
     if (new URL(req.url).searchParams.get("preview")) {
-      const { pending, progress, days, plan } = await buildReminder();
-      if (!pending.length && !plan.days[0].items.length) return NextResponse.json({ pending: 0 });
-      return new NextResponse(renderEmail(pending, progress, days, plan).html, {
-        headers: { "content-type": "text/html" },
+      const { pending, progress, days, plan, careers } = await buildReminder();
+      if (!pending.length && !plan.days[0].items.length && !careers.finds.length && !careers.deadlines.length && !careers.steps.length) return NextResponse.json({ pending: 0 });
+      return new NextResponse(renderEmail(pending, progress, days, plan, careers).html, {
+        headers: { "content-type": "text/html; charset=utf-8" },
       });
     }
     return NextResponse.json(await sendReminder());

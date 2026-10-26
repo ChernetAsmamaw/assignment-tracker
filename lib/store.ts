@@ -2,13 +2,13 @@ import { Redis } from "@upstash/redis";
 import { createClient } from "@redis/client";
 import { promises as fs } from "fs";
 import path from "path";
-import { sheets, sheetsSetup, SheetsError } from "./sheets";
+import { supabase, supabaseSetup, SupabaseError } from "./supabase";
 import { emptyProgress, type Progress } from "./types";
 
-// Saved data lives in a Google Sheet or Redis when one is connected, and in .data/*.json
-// when running locally. Vercel names the Redis variables differently depending on how the
-// database was added (KV_REST_API_URL, the same with a custom prefix, UPSTASH_REDIS_REST_URL,
-// or only a redis:// URL for a plain Redis), so any of them works.
+// Saved data lives in Supabase or Redis when one is connected, and in .data/*.json when running locally.
+// Vercel names the Redis variables differently depending on how the database was added
+// (KV_REST_API_URL, the same with a custom prefix, UPSTASH_REDIS_REST_URL, or only a
+// redis:// URL for a plain Redis), so any of them works.
 
 export interface Kv {
   hgetall<T>(key: string): Promise<Record<string, T>>;
@@ -65,11 +65,11 @@ function tcp(url: string): Kv {
   };
 }
 
-// A Google Sheet when one is set up. Otherwise Redis: the REST API suits serverless functions
-// best (no connection to open), so it's used when both kinds exist.
+// Supabase when it's set up. Otherwise Redis: the REST API suits serverless functions best
+// (no connection to open), so it's used when both kinds exist.
 function findDatabase(): Kv | null {
-  const sheet = sheetsSetup();
-  if (sheet) return sheets(sheet);
+  const project = supabaseSetup();
+  if (project) return supabase(project);
   const env = process.env;
   const likely = (k: string) => (/KV|REDIS|UPSTASH/.test(k) ? 0 : 1);
   const rest = Object.keys(env)
@@ -85,8 +85,8 @@ function findDatabase(): Kv | null {
 const kv = findDatabase();
 
 export const NO_DATABASE =
-  "Nothing can be saved yet because this site has no database. Connect a Google Sheet: add GOOGLE_SHEET_ID and " +
-  "GOOGLE_SERVICE_ACCOUNT_JSON to this project in Vercel (the README has the steps), then redeploy.";
+  "Nothing can be saved yet because this site has no database. Connect Supabase: add SUPABASE_URL and " +
+  "SUPABASE_SECRET_KEY to this project in Vercel (the README has the steps), then redeploy.";
 
 // Vercel's disk is read-only, so there it can only save to a database.
 export const canSave = () => !!kv || !process.env.VERCEL;
@@ -123,7 +123,7 @@ async function readData<T>(name: string): Promise<T | null> {
 // Why a save failed, in words a page can show.
 export function saveError(e: unknown): string {
   console.error("save", e);
-  if (e instanceof SheetsError) return e.message;
+  if (e instanceof SupabaseError) return e.message;
   return e instanceof Error && e.message === NO_DATABASE ? NO_DATABASE : "Couldn't save that. Try again.";
 }
 
@@ -186,7 +186,7 @@ export async function cached<T>(key: string, ttlSeconds: number, make: () => Pro
   return value;
 }
 
-// Generic keyed collections (notes, topic mastery, internships): a Redis hash or rows in the sheet,
+// Generic keyed collections (notes, topic mastery, internships): a Redis hash or rows in Supabase,
 // or a JSON file locally.
 export async function listAll<T>(name: string): Promise<Record<string, T>> {
   if (kv) return kv.hgetall<T>(name);

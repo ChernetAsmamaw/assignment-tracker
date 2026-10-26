@@ -19,7 +19,7 @@ export default async function PlanPage() {
         <div>
           <span className="eyebrow">Planner agent</span>
           <h1>Your next two weeks</h1>
-          <p>Assignment steps, and time to understand the concepts each one needs, fitted into the hours you actually have.</p>
+          <p>Assignment steps fitted into the hours you actually have.</p>
         </div>
       </header>
       {isDemo() && <div className="banner">Planning with sample assignments. Add your Quercus token (CANVAS_TOKEN) to plan your real ones.</div>}

@@ -1,6 +1,6 @@
 # Pace: your AI study team
 
-Pace connects to Quercus (UofT's Canvas) and gives every student a small team of **AI agents, powered by Google Gemini**. They plan your week around your real life, record your classes into notes you can trace back to the lecture, help you understand the concepts your projects and assignments depend on, and measure how well you actually know each topic. Deadlines are only the starting point.
+Pace connects to Quercus (UofT's Canvas) and gives every student a small team of **AI agents, powered by Google Gemini**. They plan your week around your real life, keep your notes for every course (recording a class turns it into notes you can trace back to the lecture), and measure how well you actually know each topic. Deadlines are only the starting point.
 
 Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free tier, Vercel Hobby, Upstash free and Resend free.
 
@@ -11,16 +11,16 @@ Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free t
 | Agent | What it does | How |
 | --- | --- | --- |
 | **Command bar** (⌘K) | One box for everything: "I work Tuesday 5 to 10", "Open my CSC263 notes", "Quiz me on heaps". | Gemini **function calling** picks the right agent and extracts its arguments, then the app runs it. |
-| **Planner** | Fits every assignment step, plus time to understand the concepts it needs, into the hours you have each day. Takes plain-English changes to your week. Flags crunch days, missing rest days and deadlines that won't fit, and writes a weekly coaching note. | Deterministic earliest-deadline-first scheduler in Toronto time. Gemini turns your message into per-day hour changes (structured output). |
-| **Study** | One page per course, laid out like a Notion doc: the concepts its projects and assignments depend on, each explained from your class notes, linked to the class and the exact transcript lines it was taught in, the work that needs it, and questions that check you can explain and apply it. Mark each one Not yet, Learning or Understood. Anything not understood becomes a short "Understand ..." block in the planner before the soonest work that needs it, and in the morning email. | Gemini structured output over your class notes (by reference, so every explanation keeps its sources) and the open assignment descriptions. Explanations with no valid note behind them are dropped. Without a key, concepts you add are traced to the class lines that mention them. |
-| **Performance** | Reads your real Quercus grades per course (average, trend, late and missed work) and your topic mastery, then tells you where to focus. Quizzes you on your courses' concepts to measure proficiency. | Gemini writes 5-question quizzes graded in the browser. Mastery is a weighted moving score per topic. Gemini writes insights from the numbers. |
+| **Planner** | Fits every assignment step into the hours you have each day. Takes plain-English changes to your week. Flags crunch days, missing rest days and deadlines that won't fit, and writes a weekly coaching note. | Deterministic earliest-deadline-first scheduler in Toronto time. Gemini turns your message into per-day hour changes (structured output). |
+| **Study** | Your notes, one list per course in date order. A note is a clean page you type on, with its date in the top right corner: change the date and the note moves to its place in the list. Press **Record** on any note to record the class while you write (see below). | Notes save as you type. Recorded classes are transcribed and written up by Gemini, with every line keeping its transcript source. |
+| **Performance** | Reads your real Quercus grades per course (average, trend, late and missed work) and your topic mastery, then tells you where to focus. Quizzes you on any topic to measure proficiency. | Gemini writes 5-question quizzes graded in the browser. Mastery is a weighted moving score per topic. Gemini writes insights from the numbers. |
 | **Career agent** (Internships) | Tracks practicum, internship, co-op and conference applications. A list split into **Priority** (starred, soonest deadline first) and **By relevance** (ranked by fit with your background and location). Each opportunity gets a dated application plan (what to prioritize, which parts of your background to lead with, what's easy to miss) and a personalized cover letter. | Gemini structured output over your profile and the posting. Plan steps are dated back from the deadline with a two-day buffer. |
 | **Scout** | Every morning it searches the web for internships, practicums and conferences that fit your profile, and checks the career sites you follow (GFT Technologies by default). New finds land in an inbox and the morning email, and nothing is added until you say so. | Gemini with **Google Search grounding** (free tier, 3 searches a day), run by a Vercel Cron job. Dead links fall back to the search source; expired postings and repeats are dropped. |
 | **Assignment coach** | Breaks any assignment into steps with hour estimates and easy-to-miss requirements, finds resources, and answers questions from the instructor's instructions. | Gemini with JSON schemas over the Quercus description. |
 
 Every agent has a rule-based fallback, so the app works without a key and never shows a blank screen in a demo.
 
-| Study: a course and its concepts | Performance and quiz |
+| Study: a course's notes, in date order | Performance and quiz |
 | --- | --- |
 | ![Study](docs/study.png) | ![Performance](docs/performance.png) |
 
@@ -28,12 +28,13 @@ Every agent has a rule-based fallback, so the app works without a key and never 
 | --- | --- | --- |
 | ![Planner](docs/planner.png) | ![Command bar](docs/command-bar.png) | ![Mobile](docs/mobile.png) |
 
-## Class notes
+## Notes and class recordings
 
-Class notes live inside each course in **Study**. **Record a class** uses your laptop or phone mic and turns the class into a transcript, a summary, notes by topic, key terms and a to-do list of what you were told to do. Notes are written only from the transcript: every line keeps the transcript segments it came from, and hovering (or tapping) it shows the exact words, highlights them in the transcript side panel and can play the audio from that moment. Lines Gemini returns without a valid source are dropped, and the page says how many.
+Every course in **Study** is a list of your notes, oldest first. **+ New note** opens an empty page dated today, with the cursor in the title; what you type saves as you go. Click the date in the top right corner to change it, and the note moves to that day in the course's list.
 
-- While it records, type your own notes on the page. They save as you type and tell Gemini what mattered to you, but every written note still needs a transcript source.
-- When the notes are written, the course's concepts update in the background, and the class page lists the concepts it taught.
+**Record** on a note uses your laptop or phone mic and turns the class into a transcript, a summary, notes by topic, key terms and a to-do list of what you were told to do. They appear under your own notes. Class notes are written only from the transcript: every line keeps the transcript segments it came from, and hovering (or tapping) it shows the exact words, highlights them in the transcript side panel and can play the audio from that moment. Lines Gemini returns without a valid source are dropped, and the page says how many.
+
+- Keep typing your own notes while it records. They tell Gemini what mattered to you, but every written line still needs a transcript source.
 
 - Audio is cut into one-minute 16 kHz WAV chunks; each is uploaded and transcribed by Gemini while the class is still going, so a long lecture never hits upload limits and a dropped connection only retries that minute.
 - The audio itself stays in your browser (IndexedDB) for playback; only the transcript and notes are saved to Redis.
@@ -56,14 +57,14 @@ The interface borrows from the Arc browser: a translucent sidebar on a soft grad
 - **Next.js 15** (App Router, React 19, TypeScript) on **Vercel**, with Vercel Cron for the 8am email
 - **Google Gemini API** (`gemini-flash-latest`, free tier) over REST: structured JSON output and function calling
 - **Canvas LMS REST API** for Quercus assignments, instructions, submissions and grades
-- **Upstash Redis** for progress, steps, class notes, concepts, mastery, settings and an AI answer cache
+- **Redis** (Upstash free tier, or any Redis) for notes, progress, steps, mastery, settings and an AI answer cache
 - **Resend** for email, `sanitize-html` for instructor HTML
 
 ```
 Quercus ─▶ canvas.ts ─▶ planner.ts (scheduler, burnout signals) ─▶ Today · Planner · email
-                │              ▲            ▲
-                ▼              │            │ "understand ..." blocks
-        agents/* ─▶ Gemini     │ steps      └── study.ts (concepts) ◀── lectures.ts (class notes)
+                │              ▲
+                ▼              │ steps
+        agents/* ─▶ Gemini ────┘        lectures.ts (notes, class recordings) ─▶ Study
    router · planner · performance · ai.ts (assignment coach)
 ```
 
@@ -72,7 +73,7 @@ Quercus ─▶ canvas.ts ─▶ planner.ts (scheduler, burnout signals) ─▶ T
 1. **Quercus token**: Quercus → Account → Settings → *+ New access token*.
 2. **Gemini key** (free, no billing needed): [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 3. **Resend**: sign up with the address you want reminders at and create an API key.
-4. **Vercel**: import this repo and add **Upstash for Redis** from the *Storage* tab.
+4. **Vercel**: import this repo, then in the project's *Storage* tab create a free **Upstash for Redis** database and connect it to the project. Vercel's disk is read-only, so without a database nothing can be saved there, and the app shows a banner saying so. Any Redis works: Pace looks for `KV_REST_API_URL`/`KV_REST_API_TOKEN` (with or without a custom prefix), `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, or a plain `redis://` URL such as `REDIS_URL`.
 5. **Environment variables** (tick Production): `CANVAS_TOKEN`, `GEMINI_API_KEY`, `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`. Optional: `GEMINI_MODEL` (default `gemini-flash-latest`), `REMIND_DAYS`, `REMINDER_FROM`, `CANVAS_BASE_URL` (any Canvas school).
 6. Redeploy.
 
@@ -83,4 +84,4 @@ npm install
 npm run dev
 ```
 
-Without `CANVAS_TOKEN` it shows sample courses with grades; without Redis it saves to `.data/`; without `GEMINI_API_KEY` the agents use their rule-based fallbacks.
+Without `CANVAS_TOKEN` it shows sample courses with grades; without Redis it saves to `.data/` (locally only); without `GEMINI_API_KEY` the agents use their rule-based fallbacks.

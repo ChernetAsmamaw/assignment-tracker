@@ -21,7 +21,7 @@ const FUNCTIONS = [
   {
     name: "open_study",
     description:
-      "The student wants a course's class notes or recordings, the concepts they need to understand for its assignments and projects, or to study a course.",
+      "The student wants a course's notes or class recordings, or to study a course.",
     parameters: {
       type: "OBJECT",
       properties: { courseCode: { type: "STRING", description: "One of the student's course codes" } },
@@ -73,7 +73,7 @@ export async function route(text: string, assignments: Assignment[], context = "
 function keywordRoute(text: string, assignments: Assignment[], courses: string[]): Route {
   const t = text.toLowerCase();
   const course = courses.find((c) => t.includes(c.toLowerCase())) ?? "";
-  if (/\b(notes?|lectures?|concepts?|understand)\b/.test(t)) return { agent: "study", courseCode: course };
+  if (/\b(notes?|lectures?)\b/.test(t)) return { agent: "study", courseCode: course };
   if (/\b(quiz me|practice|test me)\b/.test(t)) return { agent: "quiz", courseCode: course, topic: "" };
   if (/\b(busy|shift|work|off|free|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow)\b/.test(t)) return { agent: "planner", instruction: text };
   const hit = assignments.find((a) => t.includes(a.name.toLowerCase()) || a.name.toLowerCase().split(/\s+/).filter((w) => w.length > 3).some((w) => t.includes(w)));

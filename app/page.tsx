@@ -5,13 +5,15 @@ import { courseStats } from "@/lib/agents/performance";
 import { loadAll } from "@/lib/data";
 import { countdown, formatDue } from "@/lib/format";
 import { fmtHours, isOpen, PRESSURE_LABEL } from "@/lib/planner";
+import { listOpportunities } from "@/lib/careers-store";
+import { deadlineInfo, isToApply, sortPriority, torontoToday } from "@/lib/careers";
 
 export const dynamic = "force-dynamic";
 
 const TZ = "America/Toronto";
 
 export default async function Today() {
-  const { assignments, progress, plan, studyPlans, mastery } = await loadAll();
+  const [{ assignments, progress, plan, studyPlans, mastery }, opps] = await Promise.all([loadAll(), listOpportunities()]);
   const now = new Date();
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" }).format(now));
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -28,6 +30,8 @@ export default async function Today() {
   const overall = pts.length ? Math.round((pts.reduce((n, a) => n + a.score!, 0) / pts.reduce((n, a) => n + a.points!, 0)) * 100) : null;
   const weakest = [...mastery].sort((a, b) => a.score - b.score)[0];
   const falling = stats.filter((s) => (s.trend ?? 0) <= -8);
+  const newFinds = opps.filter((o) => o.status === "suggested").length;
+  const nextApp = sortPriority(opps.filter((o) => isToApply(o) && o.deadline && o.deadline >= torontoToday()))[0];
 
   return (
     <>
@@ -68,6 +72,12 @@ export default async function Today() {
           <span className="small">
             {falling.length ? `${falling.map((s) => s.courseCode).join(", ")} slipping` : weakest ? `Weakest topic: ${weakest.topic} (${weakest.score}%)` : "Take a quiz to measure a topic"}
           </span>
+        </Link>
+        <Link href="/careers" className="agent g-career">
+          <span className="ico">◆</span>
+          <span className="muted small">Career agent</span>
+          <span className="big">{newFinds ? `${newFinds} new to review` : nextApp ? deadlineInfo(nextApp.deadline).label : "Internships"}</span>
+          <span className="small">{nextApp ? `Next application: ${nextApp.organization}, ${nextApp.title}` : newFinds ? "The Scout found openings that fit you" : "Track applications and let the Scout search daily"}</span>
         </Link>
         <Link href={next ? `/a/${next.id}` : "/assignments"} className="agent g-due">
           <span className="ico">⏱</span>

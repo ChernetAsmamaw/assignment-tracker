@@ -155,7 +155,8 @@ export default function NoteView({ lecture: initial, courses, gemini }: {
     typed.current = null;
     const ok = await save(patch);
     if (!ok) typed.current = { ...patch, ...(typed.current ?? {}) }; // sent again with the next save
-    setSaveState(ok ? "saved" : "failed");
+    // Anything typed while this save was on its way is still waiting for its own.
+    setSaveState(ok ? (typed.current ? "saving" : "saved") : "failed");
   }, [save]);
   const type = (patch: { title?: string; myNotes?: string }) => {
     typed.current = { ...typed.current, ...patch };
@@ -217,8 +218,13 @@ export default function NoteView({ lecture: initial, courses, gemini }: {
   const remove = async () => {
     setMenu(false);
     if (!confirm("Delete this note? Its recording and transcript go too.")) return;
+    // Land what was just typed first, so no save can arrive after the note is gone.
+    await flush();
+    await queue(async () => undefined);
     const res = await fetch(`/api/lectures/${lecture.id}`, { method: "DELETE" }).catch(() => null);
     if (!res?.ok) return setErr((await res?.json().catch(() => null))?.error ?? "Couldn't delete the note. Try again.");
+    clearTimeout(typeTimer.current);
+    typed.current = null;
     await deleteChunks(lecture.id);
     router.push(studyHref(code));
     router.refresh();

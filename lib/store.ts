@@ -2,20 +2,22 @@ import { Redis } from "@upstash/redis";
 import { createClient } from "@redis/client";
 import { promises as fs } from "fs";
 import path from "path";
+import { supabase, supabaseSetup, SupabaseError } from "./supabase";
 import { emptyProgress, type Progress } from "./types";
 
-// Saved data lives in Redis when one is connected, and in .data/*.json when running locally.
+// Saved data lives in Supabase or Redis when one is connected, and in .data/*.json when running locally.
 // Vercel names the Redis variables differently depending on how the database was added
 // (KV_REST_API_URL, the same with a custom prefix, UPSTASH_REDIS_REST_URL, or only a
 // redis:// URL for a plain Redis), so any of them works.
 
-interface Kv {
+export interface Kv {
   hgetall<T>(key: string): Promise<Record<string, T>>;
   hget<T>(key: string, field: string): Promise<T | null>;
   hset(key: string, field: string, value: unknown): Promise<void>;
   hdel(key: string, field: string): Promise<void>;
   get<T>(key: string): Promise<T | null>;
   set(key: string, value: unknown, ttlSeconds?: number): Promise<void>;
+  problem?(): Promise<string | null>; // why nothing can be saved yet, if the database isn't set up right
 }
 
 function upstash(url: string, token: string): Kv {
@@ -63,8 +65,11 @@ function tcp(url: string): Kv {
   };
 }
 
-// The REST API suits serverless functions best (no connection to open), so it's used when both exist.
-function findRedis(): Kv | null {
+// Supabase when it's set up. Otherwise Redis: the REST API suits serverless functions best
+// (no connection to open), so it's used when both kinds exist.
+function findDatabase(): Kv | null {
+  const project = supabaseSetup();
+  if (project) return supabase(project);
   const env = process.env;
   const likely = (k: string) => (/KV|REDIS|UPSTASH/.test(k) ? 0 : 1);
   const rest = Object.keys(env)
@@ -77,14 +82,20 @@ function findRedis(): Kv | null {
   return url ? tcp(env[url]!) : null;
 }
 
-const kv = findRedis();
+const kv = findDatabase();
 
 export const NO_DATABASE =
-  "Nothing can be saved yet because this site has no database. In Vercel, open the project's Storage tab, " +
-  "create a free Upstash for Redis database, connect it to this project, then redeploy.";
+  "Nothing can be saved yet because this site has no database. Connect Supabase: add SUPABASE_URL and " +
+  "SUPABASE_SECRET_KEY to this project in Vercel (the README has the steps), then redeploy.";
 
 // Vercel's disk is read-only, so there it can only save to a database.
 export const canSave = () => !!kv || !process.env.VERCEL;
+
+// Why saving can't work on this site, if it can't, in words a page can show.
+export async function storageProblem(): Promise<string | null> {
+  if (!canSave()) return NO_DATABASE;
+  return (await kv?.problem?.()) ?? null;
+}
 
 // Writes a .data/ file. Write then rename, so two saves at once can't leave a half-written file.
 async function writeData(name: string, value: unknown): Promise<void> {
@@ -112,6 +123,7 @@ async function readData<T>(name: string): Promise<T | null> {
 // Why a save failed, in words a page can show.
 export function saveError(e: unknown): string {
   console.error("save", e);
+  if (e instanceof SupabaseError) return e.message;
   return e instanceof Error && e.message === NO_DATABASE ? NO_DATABASE : "Couldn't save that. Try again.";
 }
 
@@ -160,10 +172,11 @@ const memo = new Map<string, { at: number; value: unknown }>();
 export async function cached<T>(key: string, ttlSeconds: number, make: () => Promise<T>): Promise<T> {
   const k = `ai:${key}`;
   if (kv) {
-    const hit = await kv.get<T>(k);
+    // A cache that can't be read or written only costs a fresh answer.
+    const hit = await kv.get<T>(k).catch(() => null);
     if (hit != null) return hit;
     const value = await make();
-    await kv.set(k, value, ttlSeconds);
+    await kv.set(k, value, ttlSeconds).catch((e) => console.error("cache", e));
     return value;
   }
   const hit = memo.get(k);
@@ -173,7 +186,8 @@ export async function cached<T>(key: string, ttlSeconds: number, make: () => Pro
   return value;
 }
 
-// Generic keyed collections (notes, topic mastery, internships): a Redis hash, or a JSON file locally.
+// Generic keyed collections (notes, topic mastery, internships): a Redis hash or rows in Supabase,
+// or a JSON file locally.
 export async function listAll<T>(name: string): Promise<Record<string, T>> {
   if (kv) return kv.hgetall<T>(name);
   return (await readData<Record<string, T>>(name)) ?? {};

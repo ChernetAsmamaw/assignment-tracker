@@ -23,7 +23,7 @@ Pace connects to Quercus and gives you a team of AI agents powered by Google Gem
 It deliberately helps students plan, understand and practise; it never writes graded work, and it never gives medical advice.
 
 ### How we built it
-Next.js 15 (App Router, React 19, TypeScript) on Vercel. Quercus data comes from the Canvas LMS REST API, including grades. Gemini Flash is called over REST with structured JSON output (typed data the app can schedule) and function calling (the command bar). The numbers are ours and deterministic: an earliest-deadline-first scheduler in Toronto time, a capacity model from energy and sleep, a strain score with named drivers, and pace learning that compares actual to planned minutes and shrinks toward 1 (as if you'd already done an hour on plan) so one slow night can't double your plan. Gemini decides what to say and what to do; the code decides how much and when. Upstash Redis stores everything, Vercel Cron and Resend send the email, and the calendar is a standard iCalendar feed. The whole stack runs on free tiers.
+Next.js 15 (App Router, React 19, TypeScript) on Vercel. Quercus data comes from the Canvas LMS REST API, including grades. Gemini Flash is called over REST with structured JSON output (typed data the app can schedule) and function calling (the command bar). The numbers are ours and deterministic: an earliest-deadline-first scheduler in Toronto time, a capacity model from energy and sleep, a strain score with named drivers, and pace learning that compares actual to planned minutes and shrinks toward 1 (as if you'd already done an hour on plan) so one slow night can't double your plan. Gemini decides what to say and what to do; the code decides how much and when. Supabase (Postgres) stores everything through its REST API, Vercel Cron and Resend send the email, and the calendar is a standard iCalendar feed. The whole stack runs on free tiers.
 
 ### Challenges we ran into
 Making adaptation safe: learned pace has to move with real evidence but not overreact, so we used shrinkage and clamping, and only apply it after two finished blocks. Keeping AI out of the arithmetic, so plans stay explainable and repeatable. Time zones and daylight saving in both the scheduler and the calendar feed. Keeping a live demo bulletproof: every agent has a rule-based fallback.
@@ -38,7 +38,7 @@ Agents work best with a narrow job and a deterministic engine underneath. Wellbe
 Learning a student's best hours of the day from focus sessions, group task splitting, two-way calendar sync that reads busy times, and opening it to any Canvas school.
 
 ### Built with
-nextjs, react, typescript, gemini-api, google-ai-studio, function-calling, canvas-lms-api, icalendar, vercel, upstash-redis, resend
+nextjs, react, typescript, gemini-api, google-ai-studio, function-calling, canvas-lms-api, icalendar, vercel, supabase, postgresql, resend
 
 **Links:** GitHub: https://github.com/ChernetAsmamaw/assignment-tracker · Live demo: https://assignment-tracker-ochre-xi.vercel.app
 
@@ -63,11 +63,11 @@ nextjs, react, typescript, gemini-api, google-ai-studio, function-calling, canva
 - **How is pace learned?** Finished focus blocks only. Per course, (actual minutes + 60) / (planned minutes + 60) over the last 12 blocks, clamped to 0.6 to 2x, applied after 2 blocks. Planned minutes are stored before pace is applied, so it doesn't compound.
 - **Is the strain score medical?** No. It's a transparent sum of named signals with fixed weights, meant to prompt a small change early. The coach never gives medical advice.
 - **Why not let the AI schedule?** LLMs are bad at arithmetic and not repeatable. Same inputs always give the same plan.
-- **Privacy?** One student's data, a password-protected site, and the calendar link is a secret token derived from the password.
-- **Cost?** Zero: Gemini free tier, Vercel Hobby, Upstash free, Resend free.
+- **Privacy?** One student's data, kept in their own Supabase project in a table only the server's secret key can open, a password-protected site, and the calendar link is a secret token derived from the password.
+- **Cost?** Zero: Gemini free tier, Vercel Hobby, Supabase Free, Resend free.
 
 ## Before you present
-1. Make sure `GEMINI_API_KEY` and a Redis database are set in Vercel (Production), then merge the PR.
+1. Make sure `GEMINI_API_KEY`, `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are set in Vercel (Production), then merge the PR. Free Supabase projects pause after a week without use, so open the site the day before.
 2. Check in for the last few days and finish two focus blocks in one course so the pace card and strain chart aren't empty.
 3. Subscribe to the calendar feed in Google Calendar the day before (Google refreshes subscribed calendars every few hours).
 4. Open Wellbeing, Planner and Performance once so their notes are cached.

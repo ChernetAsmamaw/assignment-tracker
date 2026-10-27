@@ -2,7 +2,7 @@
 
 Pace connects to Quercus (UofT's Canvas) and gives every student a small team of **AI agents, powered by Google Gemini**. They plan your week around your real life, keep your notes for every course (recording a class turns it into notes you can trace back to the lecture), and measure how well you actually know each topic. Deadlines are only the starting point.
 
-Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free tier, Vercel Hobby, Upstash free and Resend free.
+Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free tier, Vercel Hobby, Supabase Free and Resend free.
 
 ![Today](docs/today.png)
 
@@ -39,7 +39,7 @@ Every course in **Study** is a list of your notes, oldest first. **+ New note** 
 - Keep typing your own notes while it records. They tell Gemini what mattered to you, but every written line still needs a transcript source.
 
 - Audio is cut into one-minute 16 kHz WAV chunks; each is uploaded and transcribed by Gemini while the class is still going, so a long lecture never hits upload limits and a dropped connection only retries that minute.
-- The audio itself stays in your browser (IndexedDB) for playback; only the transcript and notes are saved to Redis.
+- The audio itself stays in your browser (IndexedDB) for playback; only the transcript and notes are saved to your Supabase database.
 - Without `GEMINI_API_KEY` it uses the browser's live captions (Chrome, Edge, Safari) for the transcript and picks the strongest sentences as notes, each still linked to its source. You can also paste a transcript.
 
 ![Class notes](docs/class-notes.png)
@@ -59,7 +59,7 @@ The interface borrows from the Arc browser: a translucent sidebar on a soft grad
 - **Next.js 15** (App Router, React 19, TypeScript) on **Vercel**, with Vercel Cron for the 8am email
 - **Google Gemini API** (`gemini-flash-latest`, free tier) over REST: structured JSON output and function calling
 - **Canvas LMS REST API** for Quercus assignments, instructions, submissions and grades
-- **Redis** (Upstash free tier, or any Redis) for notes, progress, steps, mastery, settings and an AI answer cache
+- **Supabase** (Postgres) as the database, through its REST API (or Redis): notes, progress, steps, mastery, settings and an AI answer cache
 - **Resend** for email, `sanitize-html` for instructor HTML
 
 ```
@@ -75,9 +75,18 @@ Quercus ─▶ canvas.ts ─▶ planner.ts (scheduler, burnout signals) ─▶ T
 1. **Quercus token**: Quercus → Account → Settings → *+ New access token*.
 2. **Gemini key** (free, no billing needed): [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 3. **Resend**: sign up with the address you want reminders at and create an API key.
-4. **Vercel**: import this repo, then in the project's *Storage* tab create a free **Upstash for Redis** database and connect it to the project. Vercel's disk is read-only, so without a database nothing can be saved there, and the app shows a banner saying so. Any Redis works: Pace looks for `KV_REST_API_URL`/`KV_REST_API_TOKEN` (with or without a custom prefix), `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, or a plain `redis://` URL such as `REDIS_URL`.
-5. **Environment variables** (tick Production): `CANVAS_TOKEN`, `GEMINI_API_KEY`, `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`. Optional: `GEMINI_MODEL` (default `gemini-flash-latest`), `REMIND_DAYS`, `REMINDER_FROM`, `CANVAS_BASE_URL` (any Canvas school).
-6. Redeploy.
+4. **Supabase** (the database; the Free plan needs no card):
+   1. Sign in at [supabase.com/dashboard](https://supabase.com/dashboard) and create a project on the Free plan. Any name and database password will do (Pace doesn't use the password). Pick the region closest to you.
+   2. When the project is ready, open **SQL Editor**, paste in all of [`supabase/schema.sql`](supabase/schema.sql) and click **Run**. It creates the one table Pace saves to, `pace`, and lets only your server open it.
+   3. Click **Connect** at the top of the project and copy the project URL. It looks like `https://abcdefghijklmnopqrst.supabase.co`.
+   4. Open **Project Settings → API Keys** and copy a **secret key** (it starts with `sb_secret_`). If you only see the older `anon` and `service_role` keys, click *Create new API keys* first. Keep it private: it can read and change everything in the project.
+
+   Everything Pace saves is in **Table Editor → pace**, one row per item. Free projects pause after a week without use; if the banner says so, open the project in Supabase and click *Resume project*.
+5. **Vercel**: import this repo. Vercel's disk is read-only, so until Supabase is connected nothing can be saved, and every page shows a banner saying what's missing.
+6. **Environment variables** (tick Production): `CANVAS_TOKEN`, `GEMINI_API_KEY`, `SUPABASE_URL` (the project URL), `SUPABASE_SECRET_KEY` (the secret key), `APP_PASSWORD`, `RESEND_API_KEY`, `REMINDER_TO`, `CRON_SECRET`, `APP_URL`. Optional: `GEMINI_MODEL` (default `gemini-flash-latest`), `REMIND_DAYS`, `REMINDER_FROM`, `CANVAS_BASE_URL` (any Canvas school).
+7. Redeploy.
+
+Prefer Redis? Leave out the two Supabase variables and connect a free **Upstash for Redis** database from the project's *Storage* tab in Vercel. Pace looks for `KV_REST_API_URL`/`KV_REST_API_TOKEN` (with or without a custom prefix), `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, or a plain `redis://` URL such as `REDIS_URL`.
 
 ## Local development
 
@@ -86,4 +95,4 @@ npm install
 npm run dev
 ```
 
-Without `CANVAS_TOKEN` it shows sample courses with grades; without Redis it saves to `.data/` (locally only); without `GEMINI_API_KEY` the agents use their rule-based fallbacks.
+Without `CANVAS_TOKEN` it shows sample courses with grades; without Supabase or Redis it saves to `.data/` (locally only); without `GEMINI_API_KEY` the agents use their rule-based fallbacks. To use your Supabase project locally too, put `SUPABASE_URL` and `SUPABASE_SECRET_KEY` in a `.env.local` file (git ignores it).

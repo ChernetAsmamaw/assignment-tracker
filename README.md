@@ -12,7 +12,7 @@ Built for **Hack the Valley 11**. Runs entirely on free tiers: Gemini API free t
 | --- | --- | --- |
 | **Command bar** (⌘K) | One box for everything: "I work Tuesday 5 to 10", "Open my CSC263 notes", "Quiz me on heaps". | Gemini **function calling** picks the right agent and extracts its arguments, then the app runs it. |
 | **Planner** | Fits every assignment step into the hours you have each day. Takes plain-English changes to your week. Flags crunch days, missing rest days and deadlines that won't fit, and writes a weekly coaching note. | Deterministic earliest-deadline-first scheduler in Toronto time. Gemini turns your message into per-day hour changes (structured output). |
-| **Study** | Your notes, one list per course in date order. A note is a clean page you type on, with its date in the top right corner: change the date and the note moves to its place in the list. Press **Record** on any note to record the class while you write (see below). | Notes save as you type. Recorded classes are transcribed and written up by Gemini, with every line keeping its transcript source. |
+| **Study** | Your notes, one list per course in date order. A note is a clean page you type on, with its date in the top right corner: change the date and the note moves to its place in the list. Press **Record** on any note to record the class while you write (see below). | Notes save as you type, and an untitled note gets a title from what's on it. Recorded classes are transcribed and written up by Gemini while they record, following an editable Markdown guide, with every line keeping its transcript source. |
 | **Performance** | Reads your real Quercus grades per course (average, trend, late and missed work) and your topic mastery, then tells you where to focus. Quizzes you on any topic to measure proficiency. | Gemini writes 5-question quizzes graded in the browser. Mastery is a weighted moving score per topic. Gemini writes insights from the numbers. |
 | **Career agent** (Internships) | Tracks practicum, internship, co-op and conference applications. A list split into **Priority** (starred, soonest deadline first) and **By relevance** (ranked by fit with your background and location). Each opportunity gets a dated application plan (what to prioritize, which parts of your background to lead with, what's easy to miss) and a personalized cover letter. | Gemini structured output over your profile and the posting. Plan steps are dated back from the deadline with a two-day buffer. |
 | **Scout** | Every morning it searches the web for internships, practicums and conferences that fit your profile, and checks the career sites you follow (GFT Technologies by default). New finds land in an inbox and the morning email, and nothing is added until you say so. | Gemini with **Google Search grounding** (free tier, 3 searches a day), run by a Vercel Cron job. Dead links fall back to the search source; expired postings and repeats are dropped. |
@@ -34,13 +34,15 @@ Every agent has a rule-based fallback, so the app works without a key and never 
 
 Every course in **Study** is a list of your notes, oldest first. **+ New note** opens an empty page dated today, with the cursor in the title; what you type saves as you go. Click the date in the top right corner to change it, and the note moves to that day in the course's list.
 
-**Record** on a note uses your laptop or phone mic and turns the class into a transcript, a summary, notes by topic, key terms and a to-do list of what you were told to do. They appear under your own notes. Class notes are written only from the transcript: every line keeps the transcript segments it came from, and hovering (or tapping) it shows the exact words, highlights them in the transcript side panel and can play the audio from that moment. Lines Gemini returns without a valid source are dropped, and the page says how many.
+**Record** on a note uses your laptop or phone mic and turns the class into a transcript and notes to study from, under your own: **In short** (the gist), **Key takeaways**, a **To do** list of what you were told to do, notes by topic with the points the lecturer stressed or said are on a test flagged **Exam**, **Key terms**, and **Check yourself** questions whose answers open on a click. Class notes are written only from the transcript: every line keeps the transcript segments it came from, and hovering (or tapping) it shows the exact words, highlights them in the transcript side panel and can play the audio from that moment. Lines Gemini returns without a valid source are dropped, and the page says how many.
 
 - Keep typing your own notes while it records. They tell Gemini what mattered to you, but every written line still needs a transcript source.
-
+- A long class is written up while it records: every 10 minutes of transcript gets its own notes, which build up on the page as the class goes on. When you stop, Pace writes the last few minutes and an overview of the whole class at the same time, joins up topics the class came back to, and adds the summary, takeaways and questions, so the notes are ready seconds after the last minute is transcribed. A class of 25 minutes or less is written in one go. That adds about one Gemini call for every 10 minutes of class, on the same free key.
+- How notes are written is up to you: [`prompts/class-notes.md`](prompts/class-notes.md) is a plain Markdown guide Gemini follows, covering what to leave out, how bullets read, when a point is flagged **Exam** and what goes in each part. Edit it and push (Vercel redeploys), and the next notes, or **Rewrite class notes** in a note's ⋯ menu, follow the new version. Whatever it says, every line still needs a transcript source.
+- An untitled note names itself from what's on it: its class notes once they're written, or your own notes once you've typed a few lines. A title you type is never replaced; clear it and Pace picks one again.
 - Audio is cut into one-minute 16 kHz WAV chunks; each is uploaded and transcribed by Gemini while the class is still going, so a long lecture never hits upload limits and a dropped connection only retries that minute.
 - The audio itself stays in your browser (IndexedDB) for playback; only the transcript and notes are saved to your Supabase database.
-- Without `GEMINI_API_KEY` it uses the browser's live captions (Chrome, Edge, Safari) for the transcript and picks the strongest sentences as notes, each still linked to its source. You can also paste a transcript.
+- Without `GEMINI_API_KEY` it uses the browser's live captions (Chrome, Edge, Safari) for the transcript and picks the strongest sentences as notes, each still linked to its source, and titles come from the first line of your notes or the terms the class used most. You can also paste a transcript.
 
 ![Class notes](docs/class-notes.png)
 
@@ -66,7 +68,7 @@ The interface borrows from the Arc browser: a translucent sidebar on a soft grad
 Quercus ─▶ canvas.ts ─▶ planner.ts (scheduler, burnout signals) ─▶ Today · Planner · email
                 │              ▲
                 ▼              │ steps
-        agents/* ─▶ Gemini ────┘        lectures.ts (notes, class recordings) ─▶ Study
+        agents/* ─▶ Gemini ────┘        lectures.ts · class-notes.ts (notes, class recordings) ─▶ Study
    router · planner · performance · ai.ts (assignment coach)
 ```
 

@@ -18,7 +18,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const lecture = await getOne<Lecture>("lectures", id);
     if (!lecture) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (b.title != null) lecture.title = String(b.title).trim().slice(0, 200);
+    if (b.title != null) Object.assign(lecture, { title: String(b.title).trim().slice(0, 200), titleAuto: false }); // yours now
     if (isDay(b.date)) lecture.date = b.date;
     if (b.courseCode != null) lecture.courseCode = String(b.courseCode).trim() || lecture.courseCode;
     if (b.transcript) {
@@ -40,7 +40,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    await Promise.all([putOne("lectures", id, null), putOne("lecturemine", id, null)]);
+    await Promise.all([putOne("lectures", id, null), putOne("lecturemine", id, null), putOne("lectureparts", id, null)]);
   } catch (e) {
     return NextResponse.json({ error: saveError(e) }, { status: 503 });
   }

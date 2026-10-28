@@ -43,6 +43,7 @@ export default function Recorder({
   onLive,
   onSegments,
   onFinished,
+  onBusy,
 }: {
   ref?: React.Ref<RecorderHandle>;
   lectureId: string;
@@ -51,6 +52,7 @@ export default function Recorder({
   onLive: (live: boolean) => void;
   onSegments: (segments: Segment[], duration: number) => void;
   onFinished: () => void;
+  onBusy?: (busy: boolean) => void; // still sending the last minutes after Stop
 }) {
   const [status, setStatus] = useState<Status>("idle");
   const [elapsed, setElapsed] = useState(0);
@@ -81,8 +83,8 @@ export default function Recorder({
   });
 
   // The audio callbacks are created once per recording, so they reach the latest props through a ref.
-  const cb = useRef({ onSegments, onFinished, onLive });
-  cb.current = { onSegments, onFinished, onLive };
+  const cb = useRef({ onSegments, onFinished, onLive, onBusy });
+  cb.current = { onSegments, onFinished, onLive, onBusy };
   useImperativeHandle(ref, () => ({ start: () => void start() }));
 
   const now = () => r.current.start + r.current.total / RATE;
@@ -96,6 +98,7 @@ export default function Recorder({
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
   useEffect(() => () => teardown(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => cb.current.onBusy?.(status === "finishing"), [status]);
 
   async function start() {
     setError("");

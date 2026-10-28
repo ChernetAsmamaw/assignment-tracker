@@ -547,6 +547,26 @@ a.src-time:hover { color: var(--blue); text-decoration: none; }
 .doc-table th { text-align: left; font-weight: 500; font-size: 14px; color: var(--ink-2); }
 .doc-table th, .doc-table td { padding: 7px 10px; border: 1px solid var(--line); vertical-align: top; line-height: 1.5; }
 .doc-table td:first-child { width: 30%; font-weight: 600; }
+/* Class notes: takeaways, points under points, test material and questions to check yourself */
+.callout-label { margin: 1px 0 2px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+.doc ol.takeaways { margin: 2px 0 6px; padding-left: 26px; }
+.doc ol.takeaways > li { padding: 4px 0; }
+.doc ol.takeaways > li::marker { color: var(--ink-3); font-weight: 600; font-variant-numeric: tabular-nums; }
+.doc li > ul { margin: 2px 0 0; padding-left: 22px; }
+.doc li li { padding: 2px 0; font-size: 15px; color: var(--ink-2); }
+.doc .src strong { font-weight: 600; color: var(--ink); }
+.doc code { padding: 1px 5px; border-radius: 4px; background: var(--soft); color: var(--ink); font: .88em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.exam-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; background: rgb(253 235 236); color: #c4332b; font: 600 11px/18px "Inter", sans-serif; letter-spacing: .03em; text-transform: uppercase; vertical-align: 2px; cursor: default; }
+@media (prefers-color-scheme: dark) { .exam-tag { background: rgb(255 115 105 / .14); color: #ff8a80; } }
+.quiz { margin-top: 4px; border-top: 1px solid var(--line); }
+.quiz details { border-bottom: 1px solid var(--line); }
+.quiz summary { display: flex; gap: 10px; padding: 9px 2px; cursor: pointer; list-style: none; font-size: 16px; line-height: 1.55; }
+.quiz summary::-webkit-details-marker { display: none; }
+.quiz summary::before { content: "▸"; flex: none; color: var(--ink-3); }
+.quiz details[open] summary::before { content: "▾"; }
+.quiz summary:hover { background: var(--hover); border-radius: 4px; }
+.quiz .quiz-a { padding: 0 2px 12px 24px; font-size: 15px; line-height: 1.6; color: var(--ink-2); }
+.doc .doc-hint.busy { display: flex; align-items: center; gap: 8px; }
 
 .bar { display: inline-block; width: 96px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; vertical-align: middle; }
 .bar i { display: block; height: 100%; border-radius: 3px; background: var(--green); }

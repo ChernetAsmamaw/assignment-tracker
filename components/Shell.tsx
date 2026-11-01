@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import CommandBar from "./CommandBar";
+import RecordingDock from "./RecordingDock";
 
 export interface Space {
   code: string;
@@ -94,6 +95,7 @@ export default function Shell({ spaces, signOut, demo, children }: { spaces: Spa
       <main className="panel">
         <div className="panel-inner">{children}</div>
       </main>
+      <RecordingDock />
       {cmd !== null && <CommandBar initial={cmd} onClose={() => setCmd(null)} />}
     </div>
   );

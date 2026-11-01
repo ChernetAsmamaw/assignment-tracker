@@ -12,8 +12,10 @@ import {
   nextWindow,
   noteDay,
   noteTitle,
+  openWindows,
   span,
   ONE_GO_SECONDS,
+  PART_SECONDS,
   type Lecture,
   type LectureNotes,
   type NotePart,
@@ -22,16 +24,20 @@ import {
   type Segment,
   type SourcedLine,
 } from "@/lib/lectures";
+import { recording, useRecording } from "@/lib/recording";
 import { serial } from "@/lib/serial";
 import { studyHref } from "@/lib/study";
 import { allLines, ClassNotes, inline } from "./ClassNotes";
-import Recorder, { type RecorderHandle } from "./Recorder";
+import { EditNotes } from "./EditNotes";
 
 type SaveState = "" | "saving" | "saved" | "failed";
+type Typed = { title?: string; myNotes?: string; notes?: LectureNotes; checked?: string[] };
 
 // A note is a page you write on. Recording a class is optional: its transcript-sourced
 // notes appear under yours, and every line links back to the words it came from. During a
-// long class they build up every 10 minutes, so they're ready soon after it ends.
+// long class they build up every 10 minutes, so they're ready soon after it ends. The
+// recording itself runs outside the page (lib/recording.ts), so it carries on while you open
+// other pages.
 export default function NoteView({ lecture: initial, parts: initialParts, courses, gemini }: {
   lecture: Lecture;
   parts: NotePart[]; // notes written so far, part by part, while the class recorded
@@ -46,8 +52,7 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
   const [parts, setParts] = useState(initialParts);
   const [partAt, setPartAt] = useState<NoteWindow | null>(null); // the stretch of class being written up now
   const [err, setErr] = useState("");
-  const [live, setLive] = useState(false);
-  const [finishing, setFinishing] = useState(false); // after Stop, the last minutes are still being sent
+  const [editing, setEditing] = useState(false);
   const [peek, setPeek] = useState(false);
   const [pinned, setPinned] = useState<string[]>([]); // transcript lines opened from a note
   const [flash, setFlash] = useState<string | null>(null);
@@ -59,11 +64,10 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
   const [copied, setCopied] = useState(false);
   const [mine, setMine] = useState(initial.myNotes ?? "");
   const [saveState, setSaveState] = useState<SaveState>("");
-  const typed = useRef<{ title?: string; myNotes?: string } | null>(null); // typed but not saved yet
+  const typed = useRef<Typed | null>(null); // typed but not saved yet
   const typeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [queue] = useState(serial);
   const { hover, bind, keep, hide, close } = useHoverCard<SourcedLine>();
-  const rec = useRef<RecorderHandle>(null);
   const titleBox = useRef<HTMLTextAreaElement>(null);
   const body = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -72,7 +76,6 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
   const now = useRef({ lecture, parts });
   now.current = { lecture, parts };
   const partsJob = useRef<Promise<void>>(Promise.resolve());
-  const partsBusy = useRef(false);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -87,10 +90,24 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
   const notes = lecture.notes;
   const hasTranscript = lecture.segments.length > 0;
   const checked = new Set(lecture.checked ?? []);
+
+  // The recorder, when it's recording this note or finishing its notes.
+  const rec = useRecording();
+  const ours = rec.id === lecture.id ? rec : null;
+  const live = ours?.status === "recording" || ours?.status === "paused";
+  const finishing = ours?.status === "finishing"; // after Stop, the last minutes are still being sent
+  const closing = ours?.status === "writing"; // then the notes are finished
+  const elsewhere = !!rec.id && !ours && rec.status !== "done"; // another note is recording
+  const working = writing || finishing || closing;
+
   // While the class records, or until its notes are finished, the parts written so far show instead.
   const draft = useMemo(() => (parts.length ? draftNotes(parts) : null), [parts]);
   const shown = (live || !notes) && draft ? draft : notes;
   const stale = shown === notes && notes && lecture.segments.length > notes.segmentCount ? lecture.segments.length - notes.segmentCount : 0;
+  const canEdit = !!notes && shown === notes && !live && !working;
+  useEffect(() => {
+    if (!canEdit) setEditing(false);
+  }, [canEdit]);
 
   // Which notes cite each transcript line, so hovering the transcript lights up the notes.
   const citedBy = useMemo(() => {
@@ -157,18 +174,8 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
     if (chunk) start(chunk, seg.start);
   };
 
-  const onSegments = useCallback((added: Segment[], duration: number) => {
-    setLecture((l) => {
-      // A retried chunk replaces the lines in its time window, as on the server.
-      const from = added[0]?.start ?? Infinity;
-      const to = added.at(-1)?.end ?? -Infinity;
-      const kept = l.segments.filter((s) => s.start < from || s.start >= to);
-      return { ...l, duration: Math.max(l.duration, duration), segments: [...kept, ...added].sort((a, b) => a.start - b.start) };
-    });
-  }, []);
-
   const save = useCallback(
-    async (patch: Partial<Pick<Lecture, "title" | "date" | "courseCode" | "myNotes" | "checked">> & { transcript?: string }) => {
+    async (patch: Partial<Pick<Lecture, "title" | "date" | "courseCode" | "myNotes" | "checked" | "notes">> & { transcript?: string }) => {
       const res = await queue(() =>
         fetch(`/api/lectures/${lecture.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }).catch(() => null),
       );
@@ -184,7 +191,7 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
     [lecture.id, queue],
   );
 
-  // The title and your notes save as you type, after a short pause.
+  // The title, your notes and your edits to the class notes save as you type, after a short pause.
   const flush = useCallback(async () => {
     clearTimeout(typeTimer.current);
     const patch = typed.current;
@@ -195,7 +202,7 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
     // Anything typed while this save was on its way is still waiting for its own.
     setSaveState(ok ? (typed.current ? "saving" : "saved") : "failed");
   }, [save]);
-  const type = (patch: { title?: string; myNotes?: string }) => {
+  const type = (patch: Typed) => {
     typed.current = { ...typed.current, ...patch };
     setSaveState("saving");
     clearTimeout(typeTimer.current);
@@ -209,7 +216,9 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
       const patch = typed.current;
       if (!patch) return;
       typed.current = null;
-      void fetch(`/api/lectures/${lecture.id}`, { method: "PUT", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }).catch(() => {});
+      const body = JSON.stringify(patch);
+      // A request sent as the page closes can carry about 64 KB; a bigger one goes the usual way.
+      void fetch(`/api/lectures/${lecture.id}`, { method: "PUT", keepalive: body.length < 60_000, headers: { "content-type": "application/json" }, body }).catch(() => {});
     };
     window.addEventListener("pagehide", onHide);
     return () => window.removeEventListener("pagehide", onHide);
@@ -221,13 +230,12 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
     if (next && autoTitle.current && document.activeElement !== titleBox.current) setTitle(next);
   }, []);
 
-  // Writes notes for each finished 10 minutes of class that has none yet, one at a time. It runs
-  // after every new minute of transcript while the class records, and catches up before the
-  // notes are finished. reset starts over.
+  // Writes notes for each finished 10 minutes of a long transcript that has none yet, one at a
+  // time, before the notes are put together from them. (While a class records, the recorder does
+  // this.) reset starts over.
   const runParts = useCallback(
     (reset = false) =>
       (partsJob.current = partsJob.current.then(async () => {
-        partsBusy.current = true;
         let first = reset;
         while (alive.current) {
           const next = nextWindow(now.current.lecture.segments, first ? [] : now.current.parts);
@@ -247,17 +255,13 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
           if (!out.written) break;
         }
         setPartAt(null);
-        partsBusy.current = false;
       })),
     [lecture.id, offerTitle],
   );
 
-  useEffect(() => {
-    if ((live || finishing) && gemini && !partsBusy.current && nextWindow(lecture.segments, parts)) void runParts();
-  }, [live, finishing, gemini, lecture.segments, parts, runParts]);
-
   const writeNotes = useCallback(
     async (fresh = false) => {
+      if (now.current.lecture.notes?.edited && !confirm("Write the class notes again? Lines you added stay, but your changes to Gemini's lines are replaced.")) return;
       setWriting(true);
       setErr("");
       // Your notes steer the class notes, so save what was just typed first.
@@ -288,15 +292,50 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
     [lecture.id, queue, flush, gemini, runParts, offerTitle],
   );
 
-  const onFinished = useCallback(() => {
+  // While this note records, its transcript and the notes so far come from the recorder, which
+  // keeps them while you're on other pages.
+  useEffect(() => {
+    if (!ours) return;
+    setLecture((l) => (l.segments === ours.segments ? l : { ...l, segments: ours.segments, duration: Math.max(l.duration, ours.duration) }));
+    setParts(ours.parts);
+  }, [ours?.segments, ours?.duration, ours?.parts]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (ours?.title) offerTitle(ours.title);
+  }, [ours?.title, offerTitle]);
+  // When its notes are finished, they show here.
+  useEffect(() => {
+    if (ours?.status !== "done") return;
+    const { done, failed } = ours;
+    if (done) {
+      setLecture((l) => ({ ...l, notes: done.notes }));
+      now.current.parts = done.parts;
+      setParts(done.parts);
+      if (done.titleAuto) offerTitle(done.title);
+    }
+    if (failed) setErr(failed);
     refreshAudio();
-    void writeNotes();
-  }, [refreshAudio, writeNotes]);
+    recording.clear();
+  }, [ours?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  // What you just typed is saved before the recorder finishes the notes, since it steers them.
+  useEffect(
+    () =>
+      recording.beforeNotes(lecture.id, async () => {
+        await flush();
+        await queue(async () => undefined);
+      }),
+    [lecture.id, flush, queue],
+  );
+  useEffect(() => recording.rename(lecture.id, { name: noteTitle({ title }), href: studyHref(code, lecture.id) }), [lecture.id, title, code]);
+
+  const record = () => {
+    if (lecture.notes?.edited && !confirm("Record more of this class? When you stop, its notes are written again: lines you added stay, but your changes to Gemini's lines are replaced.")) return;
+    void recording.start({ id: lecture.id, href: studyHref(code, lecture.id), name: noteTitle({ title }), base: lecture.duration, segments: lecture.segments, parts, gemini });
+  };
 
   // An untitled note gets a title from what's on it once there's enough to go on: a few lines of
   // your notes, or notes from its recording. A class being recorded gets one when its notes are done.
   useEffect(() => {
-    if (title.trim() || !autoTitle.current || askedTitle.current || live || finishing || writing || saveState === "saving") return;
+    if (title.trim() || !autoTitle.current || askedTitle.current || live || working || saveState === "saving") return;
     const enough = hasTranscript ? lecture.segments === initial.segments && (!!lecture.notes || parts.length > 0) : wordCount(mine) >= 12;
     if (!enough) return;
     const t = setTimeout(async () => {
@@ -306,7 +345,7 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
       if (res?.ok && out?.titleAuto) offerTitle(out.title);
     }, 1500);
     return () => clearTimeout(t);
-  }, [title, mine, live, finishing, writing, saveState, hasTranscript, lecture.segments, lecture.notes, parts.length, initial.segments, lecture.id, offerTitle]);
+  }, [title, mine, live, working, saveState, hasTranscript, lecture.segments, lecture.notes, parts.length, initial.segments, lecture.id, offerTitle]);
 
   const redate = (day: string) => {
     if (!isDay(day) || day === date) return;
@@ -329,6 +368,7 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
 
   const remove = async () => {
     setMenu(false);
+    if (ours && ours.status !== "done") return setErr("Stop the recording before you delete this note.");
     if (!confirm("Delete this note? Its recording and transcript go too.")) return;
     // Land what was just typed first, so no save can arrive after the note is gone.
     await flush();
@@ -353,6 +393,14 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
   };
 
   const line = (key: string, l: SourcedLine, tag?: React.ReactNode) => {
+    // A line you added has no source to show.
+    if (!l.sources.length)
+      return (
+        <span data-note={key} className="yours">
+          {inline(l.text)}
+          {tag}
+        </span>
+      );
     const first = byId.get(l.sources[0]);
     return (
       <span data-note={key} {...bind(key, l)} className={`src ${hover?.key === key ? "on" : ""} ${litNotes?.has(key) ? "lit" : ""} ${flash === key ? "flash" : ""}`}>
@@ -365,7 +413,25 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
 
   const others = [...new Set([code, ...courses])].filter((c) => c !== code);
   const long = span(lecture.segments) > ONE_GO_SECONDS;
-  const writingNow = partAt ? `Writing notes for ${clock(partAt.from)}–${clock(partAt.to)}…` : "";
+  const at = ours?.writing ?? partAt;
+  const writingNow = at ? `Writing notes for ${clock(at.from)}–${clock(at.to)}…` : "";
+  // While recording, when the next notes should come, on the recorder's clock: once the minute of
+  // class that's 10 minutes into the stretch with no notes yet has been transcribed (the recording
+  // is sent a minute at a time).
+  const nextNotes = (() => {
+    if (!live || !ours) return "";
+    const from = openWindows(lecture.segments, parts).find((w) => !w.ready)?.from ?? lecture.segments.at(-1)?.end ?? ours.base;
+    return clock(ours.base + (Math.floor(Math.max(0, from + PART_SECONDS - ours.base) / 60) + 1) * 60);
+  })();
+  // Your edits to the class notes save as you type, like the rest of the page.
+  const edit = (next: LectureNotes, nextChecked: string[]) => {
+    setLecture((l) => ({ ...l, notes: next, checked: nextChecked }));
+    type({ notes: next, checked: nextChecked });
+  };
+  const doneEditing = () => {
+    setEditing(false);
+    void flush();
+  };
 
   return (
     <div className={`doc-wrap ${peek ? "peeking" : ""}`}>
@@ -374,8 +440,14 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
           <Crumbs trail={[{ label: "Study", href: "/study" }, { label: code, href: studyHref(code) }, { label: noteTitle({ title }) }]} />
           <div className="doc-actions">
             {saveState && <span className={`save-state ${saveState}`}>{saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : "Not saved"}</span>}
-            {!live && (
-              <button type="button" className="ghost" onClick={() => rec.current?.start()} title="Record the class while you write">
+            {!live && !finishing && !closing && (
+              <button
+                type="button"
+                className="ghost"
+                onClick={record}
+                disabled={elsewhere}
+                title={elsewhere ? `Stop recording ${rec.name} first` : "Record the class while you write"}
+              >
                 <span className="rec-dot small" /> Record
               </button>
             )}
@@ -387,7 +459,8 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
                   <div className="menu-backdrop" onClick={() => setMenu(false)} />
                   <div className="menu" role="menu">
                     {!live && <button type="button" role="menuitem" onClick={() => (setMenu(false), setPaste(!paste))}>Paste a class transcript</button>}
-                    {hasTranscript && !live && <button type="button" role="menuitem" disabled={writing || finishing} onClick={() => (setMenu(false), writeNotes(!!notes))}>{notes ? "Rewrite class notes" : "Write class notes"}</button>}
+                    {canEdit && !editing && <button type="button" role="menuitem" onClick={() => (setMenu(false), setEditing(true))}>Edit class notes</button>}
+                    {hasTranscript && !live && <button type="button" role="menuitem" disabled={working} onClick={() => (setMenu(false), writeNotes(!!notes))}>{notes ? "Rewrite class notes" : "Write class notes"}</button>}
                     <button type="button" role="menuitem" onClick={copy}>{copied ? "Copied" : "Copy as Markdown"}</button>
                     {others.length > 0 && (
                       <>
@@ -445,16 +518,6 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
 
         {err && <div className="callout warn"><span className="callout-ico" aria-hidden>⚠️</span><div>{err}</div></div>}
 
-        <Recorder
-          ref={rec}
-          lectureId={lecture.id}
-          offset={lecture.duration}
-          gemini={gemini}
-          onLive={setLive}
-          onSegments={onSegments}
-          onFinished={onFinished}
-          onBusy={setFinishing}
-        />
         {paste && !live && (
           <PasteTranscript
             onSave={async (t) => {
@@ -465,29 +528,40 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
           />
         )}
 
-        {(live || hasTranscript) && (
+        {(live || working || hasTranscript) && (
           <section className="from-rec">
             <div className="rec-divider">
               <span>
                 From the class recording{lecture.duration > 0 ? ` · ${clock(lecture.duration)}` : ""}
-                {shown && shown === draft ? " · notes so far" : notes ? (notes.ai ? " · written by Gemini" : " · picked from the transcript") : ""}
+                {editing
+                  ? " · editing, saved as you type"
+                  : shown && shown === draft
+                    ? " · notes so far"
+                    : notes
+                      ? `${notes.ai ? " · written by Gemini" : " · picked from the transcript"}${notes.edited ? ", edited by you" : ""}`
+                      : ""}
               </span>
+              {canEdit && (
+                <button type="button" className={`ghost ${editing ? "on" : ""}`} onClick={() => (editing ? doneEditing() : setEditing(true))}>
+                  {editing ? "Done" : "✎ Edit"}
+                </button>
+              )}
             </div>
             {live ? (
               <p className={`doc-hint ${writingNow ? "busy" : ""}`}>
                 {!gemini ? (
-                  "Recording. Keep writing your notes above. When you stop, notes from the transcript appear here, and yours decide what they focus on."
+                  "Recording. Keep writing your notes above. When you stop, notes from the transcript appear here, and yours decide what they focus on. Transcript on the recorder shows what it's heard so far."
                 ) : writingNow ? (
                   <>
                     <span className="rec-spin" aria-hidden /> {writingNow}
                   </>
                 ) : draft ? (
-                  "Recording. These notes grow with every 10 minutes of class. When you stop, they're finished with a summary, the key takeaways and questions to test yourself."
+                  `Recording. These notes grow every 10 minutes of class, next at about ${nextNotes} on the recorder. When you stop, they're finished with a summary, the key takeaways and questions to test yourself.`
                 ) : (
-                  "Recording. Notes for every 10 minutes of class appear here while it goes on. Keep writing yours above: they steer what the notes focus on."
+                  `Recording. The first notes appear here at about ${nextNotes} on the recorder, then more every 10 minutes. Open Transcript on the recorder to read along, and keep writing yours above: they steer what the notes focus on.`
                 )}
               </p>
-            ) : writing || finishing ? (
+            ) : working ? (
               <div className="callout">
                 <span className="callout-ico" aria-hidden>✦</span>
                 <div>
@@ -508,7 +582,7 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
                   </button>
                 </div>
               </div>
-            ) : stale > 0 ? (
+            ) : stale > 0 && !editing ? (
               <div className="callout soft">
                 <span className="callout-ico" aria-hidden>↻</span>
                 <div>
@@ -518,9 +592,18 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
               </div>
             ) : null}
 
-            {shown && <ClassNotes notes={shown} line={line} checked={checked} onCheck={toggle} />}
+            {editing && notes ? (
+              <>
+                <EditNotes notes={notes} checked={lecture.checked ?? []} onChange={edit} />
+                <div className="edit-foot">
+                  <button type="button" className="doc-btn" onClick={doneEditing}>Done editing</button>
+                </div>
+              </>
+            ) : (
+              shown && <ClassNotes notes={shown} line={line} checked={checked} onCheck={toggle} />
+            )}
 
-            {shown && !live && (
+            {shown && !live && !editing && (
               <p className="doc-foot">
                 Hover any line to see the words it came from.
                 {shown.dropped > 0 && ` ${shown.dropped} line${shown.dropped === 1 ? "" : "s"} with no source in the transcript ${shown.dropped === 1 ? "was" : "were"} left out.`}

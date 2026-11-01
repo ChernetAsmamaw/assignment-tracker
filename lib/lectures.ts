@@ -49,6 +49,7 @@ export interface LectureNotes {
   actions: SourcedLine[]; // deadlines, readings, things to do that were said in class
   terms: Term[];
   questions?: Question[]; // to test yourself with
+  edited?: boolean; // you changed or added lines; the lines you added have no sources
   ai: boolean;
   dropped: number; // notes thrown away because they had no source in the transcript
   generatedAt: string;
@@ -339,5 +340,82 @@ export function draftNotes(parts: NotePart[]): LectureNotes {
     dropped: parts.reduce((n, p) => n + p.dropped, 0),
     generatedAt: parts.at(-1)?.writtenAt ?? "",
     segmentCount: 0,
+  };
+}
+
+// ---------- Your edits ----------
+
+// The class notes as you edited them, checked before they're saved. Gemini's lines keep the
+// sources they had; a line you add has none. How and when the notes were written stays as it was.
+export function editedNotes(raw: unknown, prev: LectureNotes, segments: Segment[]): LectureNotes {
+  const ids = new Set(segments.map((s) => s.id));
+  const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  const list = (v: unknown, max: number) => (Array.isArray(v) ? v.slice(0, max).map(obj) : []);
+  const text = (v: unknown, max = 2000) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+  const sources = (v: unknown) => (Array.isArray(v) ? [...new Set(v.map(String).filter((id) => ids.has(id)))].slice(0, 20) : []);
+  const line = (r: Record<string, unknown>): SourcedLine[] => {
+    const t = text(r.text);
+    return t ? [{ text: t, sources: sources(r.sources) }] : [];
+  };
+  const point = (r: Record<string, unknown>): NotePoint[] => {
+    const [l] = line(r);
+    if (!l) return [];
+    const sub = list(r.sub, 30).flatMap(line);
+    return [{ ...l, ...(r.exam === true ? { exam: true } : {}), ...(sub.length ? { sub } : {}) }];
+  };
+  const o = obj(raw);
+  return {
+    ...prev,
+    summary: list(o.summary, 30).flatMap(line),
+    takeaways: list(o.takeaways, 40).flatMap(point),
+    actions: list(o.actions, 60).flatMap(line),
+    sections: list(o.sections, 80).flatMap((s) => {
+      const bullets = list(s.bullets, 200).flatMap(point);
+      return bullets.length ? [{ heading: text(s.heading, 200) || "Notes", bullets }] : [];
+    }),
+    terms: list(o.terms, 150).flatMap((t) => {
+      const term = text(t.term, 200);
+      return term ? [{ term, definition: text(t.definition), sources: sources(t.sources) }] : [];
+    }),
+    questions: list(o.questions, 60).flatMap((q) => {
+      const question = text(q.question, 600);
+      return question ? [{ question, answer: text(q.answer), sources: sources(q.sources) }] : [];
+    }),
+    edited: true,
+  };
+}
+
+// New notes for a class keep the lines you added to the old ones (lines without a source), each
+// in the same part of the notes and under the same heading where there is one. Your changes to
+// Gemini's own lines are replaced with the new notes.
+export function keepYours(old: LectureNotes | null | undefined, notes: LectureNotes): LectureNotes {
+  const yours = <T extends { sources: string[] }>(lines: T[] | undefined) => (lines ?? []).filter((x) => !x.sources.length);
+  if (!old) return notes;
+  const sections = notes.sections.map((s) => ({ ...s, bullets: [...s.bullets] }));
+  let kept = 0;
+  for (const s of old.sections) {
+    const mine = yours(s.bullets);
+    if (!mine.length) continue;
+    kept += mine.length;
+    const have = sections.find((x) => same(x.heading) === same(s.heading));
+    if (have) have.bullets.push(...mine);
+    else sections.push({ heading: s.heading, bullets: mine });
+  }
+  const summary = yours(old.summary);
+  const takeaways = yours(old.takeaways);
+  const actions = yours(old.actions).filter((a) => !notes.actions.some((x) => same(x.text) === same(a.text)));
+  const terms = yours(old.terms).filter((t) => !notes.terms.some((x) => same(x.term) === same(t.term)));
+  const questions = yours(old.questions);
+  kept += summary.length + takeaways.length + actions.length + terms.length + questions.length;
+  if (!kept) return notes;
+  return {
+    ...notes,
+    summary: [...notes.summary, ...summary],
+    takeaways: [...(notes.takeaways ?? []), ...takeaways],
+    actions: [...notes.actions, ...actions],
+    sections,
+    terms: [...notes.terms, ...terms],
+    questions: [...(notes.questions ?? []), ...questions],
+    edited: true,
   };
 }

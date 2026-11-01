@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { finishNotes } from "@/lib/class-notes";
-import { currentParts, type Lecture, type LectureMine, type LectureParts } from "@/lib/lectures";
+import { currentParts, keepYours, type Lecture, type LectureMine, type LectureParts } from "@/lib/lectures";
 import { getOne, putOne, saveError } from "@/lib/store";
 
 export const maxDuration = 60;
@@ -20,9 +20,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!lecture.segments.length) return NextResponse.json({ error: "There's no transcript yet." }, { status: 400 });
   const done = await finishNotes({ ...lecture, myNotes: mine?.myNotes }, saved?.parts ?? [], { fresh, title: saved?.title });
 
-  // Save onto the latest copy, in case more transcript arrived while the notes were written.
+  // Save onto the latest copy, in case more transcript arrived while the notes were written. The
+  // lines you added to the old notes are kept.
   const latest = (await getOne<Lecture>("lectures", id)) ?? lecture;
-  latest.notes = done.notes;
+  latest.notes = keepYours(latest.notes, done.notes);
   if (done.title && (!latest.title.trim() || latest.titleAuto)) Object.assign(latest, { title: done.title, titleAuto: true });
   try {
     await Promise.all([
@@ -33,7 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: saveError(e) }, { status: 503 });
   }
   return NextResponse.json({
-    notes: done.notes,
+    notes: latest.notes,
     title: latest.title,
     titleAuto: !!latest.titleAuto,
     parts: done.parts ?? currentParts(saved?.parts ?? [], lecture.segments),

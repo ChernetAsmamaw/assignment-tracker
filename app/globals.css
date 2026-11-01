@@ -434,7 +434,7 @@ textarea.letter { min-height: 380px; margin-top: 12px; font: 14px/1.6 "Inter", s
 }
 
 /* ===== Study: Notion-style pages for courses and class notes ===== */
-.doc, .doc-wrap {
+.doc, .doc-wrap, .rec-dock {
   --ink: #37352f;
   --ink-2: rgb(55 53 47 / .65);
   --ink-3: rgb(55 53 47 / .45);
@@ -451,7 +451,7 @@ textarea.letter { min-height: 380px; margin-top: 12px; font: 14px/1.6 "Inter", s
   --green-bg: #dbeddb; --green-fg: #1c3829; --green: #448361;
 }
 @media (prefers-color-scheme: dark) {
-  .doc, .doc-wrap {
+  .doc, .doc-wrap, .rec-dock {
     --ink: rgb(255 255 255 / .82);
     --ink-2: rgb(255 255 255 / .5);
     --ink-3: rgb(255 255 255 / .32);
@@ -568,6 +568,24 @@ a.src-time:hover { color: var(--blue); text-decoration: none; }
 .quiz .quiz-a { padding: 0 2px 12px 24px; font-size: 15px; line-height: 1.6; color: var(--ink-2); }
 .doc .doc-hint.busy { display: flex; align-items: center; gap: 8px; }
 
+/* Editing the class notes: each line is a borderless box that looks like the line itself */
+.rec-divider .ghost { order: 2; }
+.rec-divider::after { order: 1; }
+.edit-field { display: block; width: calc(100% + 8px); min-height: 0; margin: -1px -4px; padding: 1px 4px; border: none; border-radius: 4px; background: none; resize: none; overflow: hidden; color: inherit; font: inherit; letter-spacing: inherit; outline: none; }
+.edit-field:hover { background: var(--hover); }
+.edit-field:focus { background: var(--hover); box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 30%, transparent); }
+.edit-field::placeholder { color: var(--ink-3); }
+.doc .edit-plain { list-style: none; padding-left: 0; }
+.doc .edit-todos > li { display: flex; gap: 8px; }
+.doc .edit-todos > li::before { content: "☐"; flex: none; color: var(--ink-3); }
+.edit-add { display: block; margin: 2px 0 4px; padding: 3px 0; border: none; background: none; color: var(--ink-3); font: 500 14px "Inter", sans-serif; }
+.edit-add:hover { color: var(--ink); }
+.edit-table td:first-child .edit-field { font-weight: 600; }
+.edit-q { padding: 8px 2px 4px; border-bottom: 1px solid var(--line); font-size: 16px; line-height: 1.55; }
+.edit-quiz .quiz-a { padding: 4px 2px 6px 24px; }
+.edit-foot { display: flex; justify-content: flex-end; margin-top: 18px; }
+.doc .yours { padding: 1px 0; }
+
 .bar { display: inline-block; width: 96px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; vertical-align: middle; }
 .bar i { display: block; height: 100%; border-radius: 3px; background: var(--green); }
 
@@ -635,7 +653,7 @@ textarea.doc-title { min-height: 0; resize: none; overflow: hidden; }
 .rec-dock { position: fixed; z-index: 40; bottom: 20px; left: calc(50% + 124px); transform: translateX(-50%); display: grid; justify-items: center; gap: 8px; width: max-content; max-width: calc(100vw - 290px); }
 .rec-caption { max-width: min(560px, 100%); padding: 6px 12px; border-radius: 8px; background: rgb(15 15 15 / .78); color: #fff; font-size: 14px; line-height: 1.45; text-align: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .rec-caption .faint { color: rgb(255 255 255 / .6); }
-.rec-pill { display: flex; align-items: center; gap: 10px; padding: 7px 7px 7px 14px; border-radius: 999px; background: var(--panel); color: var(--ink); box-shadow: var(--menu-shadow); font: 400 14px "Inter", sans-serif; white-space: nowrap; }
+.rec-pill { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 10px; padding: 7px 7px 7px 14px; border-radius: 22px; background: var(--panel); color: var(--ink); box-shadow: var(--menu-shadow); font: 400 14px "Inter", sans-serif; white-space: nowrap; }
 .rec-pill button { padding: 5px 12px; border: none; border-radius: 999px; background: var(--hover); color: var(--ink); font: 500 13px "Inter", sans-serif; }
 .rec-pill button:hover { background: var(--line); }
 .rec-pill .rec-stop { display: inline-flex; align-items: center; gap: 6px; background: var(--red); color: #fff; }
@@ -651,6 +669,21 @@ textarea.doc-title { min-height: 0; resize: none; overflow: hidden; }
 .rec-level i.on { background: var(--red); }
 .rec-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--ink-2); animation: doc-spin .8s linear infinite; }
 @keyframes doc-spin { to { transform: rotate(360deg); } }
+.rec-pill button.on { background: var(--line); }
+.rec-ico { display: none; }
+.rec-back { max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--blue); font-size: 13px; font-weight: 500; }
+.rec-note { max-width: min(560px, 100%); padding: 6px 12px; border-radius: 8px; background: var(--panel); color: var(--ink); box-shadow: var(--menu-shadow); font: 13px/1.45 "Inter", sans-serif; white-space: normal; }
+/* What's being transcribed, opened from the recorder */
+.rec-live { display: flex; flex-direction: column; width: min(560px, calc(100vw - 24px)); max-height: min(46vh, 420px); border-radius: 12px; background: var(--panel); color: var(--ink); box-shadow: var(--menu-shadow); font-family: "Inter", sans-serif; }
+.rec-live-head { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.rec-live-head span { flex: 1; min-width: 0; color: var(--ink-3); font-size: 12px; }
+.rec-live-head button { padding: 2px 10px; border: none; border-radius: 6px; background: none; color: var(--ink-2); font-size: 16px; }
+.rec-live-head button:hover { background: var(--hover); }
+.rec-live-body { flex: 1; min-height: 80px; overflow: auto; padding: 6px 14px 10px; }
+.rec-live-body p { display: grid; grid-template-columns: 52px 1fr; gap: 6px; margin: 0; padding: 3px 0; font-size: 14px; line-height: 1.5; }
+.rec-live-body .t { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.rec-live-body .heard { color: var(--ink-3); font-style: italic; }
+.rec-live-empty { display: block !important; color: var(--ink-3); }
 
 /* The transcript opens beside the notes, like Notion's side peek */
 .peek { position: fixed; z-index: 30; top: 8px; right: 8px; bottom: 8px; width: min(420px, calc(100vw - 16px)); display: flex; flex-direction: column; border-radius: 12px; background: var(--panel); color: var(--ink); box-shadow: var(--menu-shadow); font-family: "Inter", sans-serif; }
@@ -687,7 +720,15 @@ textarea.doc-title { min-height: 0; resize: none; overflow: hidden; }
   .note .doc-top { flex-wrap: wrap; row-gap: 6px; }
   .note .doc-actions { margin-left: auto; }
   .save-state { display: none; }
-  .rec-level, .rec-pill .rec-sub { display: none; }
+  /* phones: the recorder is tighter, the note's name gets its own line while recording, and
+     Pause is an icon */
+  .rec-level, .rec-pill .rec-sub:not(.rec-msg), .rec-word { display: none; }
+  .rec-ico { display: inline; }
+  .rec-pill { gap: 6px 8px; padding: 7px 7px 7px 12px; }
+  .rec-pill button { padding: 5px 10px; }
+  .rec-pill .rec-msg { flex: 1 1 180px; min-width: 0; }
+  .rec-back { max-width: 140px; }
+  .rec-pill:is(.recording, .paused) .rec-back { order: -1; flex-basis: 100%; max-width: none; text-align: center; }
 }
 
 /* Wellbeing agent */

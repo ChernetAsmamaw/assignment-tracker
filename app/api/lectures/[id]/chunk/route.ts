@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { transcribeChunk, type Lecture } from "@/lib/lectures";
-import { getOne, putOne } from "@/lib/store";
+import { getOne, putOne, saveError } from "@/lib/store";
 
 export const maxDuration = 60;
 
@@ -26,6 +26,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const added = segments.map((s) => ({ id: `s${++n}`, ...s }));
   lecture.segments = [...before, ...added, ...after];
   lecture.duration = Math.max(lecture.duration, offset + length);
-  await putOne("lectures", id, lecture);
+  try {
+    await putOne("lectures", id, lecture);
+  } catch (e) {
+    return NextResponse.json({ error: saveError(e) }, { status: 503 });
+  }
   return NextResponse.json({ segments: added, duration: lecture.duration, ai });
 }

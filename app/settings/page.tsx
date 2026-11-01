@@ -6,7 +6,7 @@ import CoursePicker, { type PickerCourse } from "./CoursePicker";
 
 export const dynamic = "force-dynamic";
 
-export default async function CoursesPage() {
+export default async function SettingsPage() {
   const [assignments, settings] = await Promise.all([getAssignments(), getSettings()]);
   const now = Date.now();
   const byCode = new Map<string, PickerCourse>();
@@ -23,9 +23,9 @@ export default async function CoursesPage() {
     <>
       <header className="page-head">
         <div>
-          <span className="eyebrow">Courses</span>
-          <h1>Choose what Pace tracks</h1>
-          <p>Untick a course or an assignment to leave it out of your lists, planner, Study, Today and the morning email. Nothing changes on Quercus, and you can tick it again any time.</p>
+          <span className="eyebrow">Settings</span>
+          <h1>Courses and assignments</h1>
+          <p>Tick the courses and assignments you want in your morning reminder email. Anything you untick also leaves your lists, planner, Study and Today. Nothing changes on Quercus, and you can tick it again any time.</p>
         </div>
       </header>
       {isDemo() && <div className="banner">Showing sample courses. Add your Quercus token (CANVAS_TOKEN) to choose from yours.</div>}

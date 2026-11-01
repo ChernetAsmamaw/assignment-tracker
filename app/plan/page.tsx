@@ -19,7 +19,7 @@ export default async function PlanPage() {
         <div>
           <span className="eyebrow">Planner agent</span>
           <h1>Your next two weeks</h1>
-          <p>Assignment steps, and time to understand the concepts each one needs, fitted into the hours you actually have.</p>
+          <p>Assignment steps fitted into the hours you actually have.</p>
         </div>
       </header>
       {isDemo() && <div className="banner">Planning with sample assignments. Add your Quercus token (CANVAS_TOKEN) to plan your real ones.</div>}
@@ -105,6 +105,9 @@ export default async function PlanPage() {
           {plan.guessed > 0 && ` ${plan.guessed} assignment${plan.guessed === 1 ? " uses" : "s use"} a rough guess.`}
         </p>
         {plan.guessed > 0 && hasGemini() && <EstimateButton count={plan.guessed} />}
+        <p className="muted small" style={{ margin: "10px 0 0" }}>
+          Want these blocks in Google Calendar or Outlook? <Link href="/wellbeing#calendar">Subscribe to your plan</Link>.
+        </p>
       </div>
     </>
   );

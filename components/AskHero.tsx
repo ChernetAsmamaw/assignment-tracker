@@ -2,7 +2,7 @@
 
 import { ask } from "./Shell";
 
-const CHIPS = ["I'm busy Tuesday evening", "Open my CSC263 notes", "Quiz me on my weakest topic", "What should I do first today?"];
+const CHIPS = ["I'm busy Tuesday evening", "Slept 5 hours, feeling drained", "Quiz me on my weakest topic", "What should I do first today?"];
 
 export default function AskHero() {
   return (

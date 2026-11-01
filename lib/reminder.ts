@@ -82,7 +82,7 @@ export function renderEmail(pending: Assignment[], progress: Record<string, Prog
     <p style="color:#555;margin:0 0 12px">Everything due in the next ${days} days that isn't submitted or marked done.</p>
     <table style="width:100%;border-collapse:collapse">${rows}</table>` : ""}
     ${careersHtml}
-    ${app ? `<p style="margin-top:16px"><a href="${esc(app)}">Open your tracker</a></p>` : ""}
+    ${app ? `<p style="margin-top:16px"><a href="${esc(app)}">Open your tracker</a> · <a href="${esc(app)}/settings" style="color:#555">Choose which courses and assignments are in this email</a></p>` : ""}
   </div>`;
   const text = [
     ...(today?.items.length ? ["Today's plan:", ...today.items.map((i) => `- ${fmtHours(i.hours)} ${i.title} (${i.courseCode} ${i.name})`), ""] : []),

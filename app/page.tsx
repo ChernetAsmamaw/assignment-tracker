@@ -7,14 +7,18 @@ import { countdown, formatDue } from "@/lib/format";
 import { fmtHours, isOpen, PRESSURE_LABEL } from "@/lib/planner";
 import { listOpportunities } from "@/lib/careers-store";
 import { deadlineInfo, isToApply, sortPriority, torontoToday } from "@/lib/careers";
-import { focusList, studyHref } from "@/lib/study";
+import { byDay, noteTitle, type Lecture } from "@/lib/lectures";
+import { listAll } from "@/lib/store";
+import { studyHref } from "@/lib/study";
+import { burnoutRisk, RISK_LABEL } from "@/lib/wellbeing";
+import { Agenda, CheckInCard } from "@/components/Wellbeing";
 
 export const dynamic = "force-dynamic";
 
 const TZ = "America/Toronto";
 
 export default async function Today() {
-  const [{ assignments, progress, plan, studies, mastery }, opps] = await Promise.all([loadAll(), listOpportunities()]);
+  const [{ assignments, progress, settings, plan, mastery, today: todayKey, checkin, checkins, sessions }, opps, lectures] = await Promise.all([loadAll(), listOpportunities(), listAll<Lecture>("lectures")]);
   const now = new Date();
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" }).format(now));
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -24,15 +28,15 @@ export default async function Today() {
     .filter((a) => isOpen(a, progress[a.id]) && a.dueAt && new Date(a.dueAt).getTime() > now.getTime())
     .slice(0, 5);
   const next = upcoming[0];
-  const focus = focusList(studies, assignments.filter((a) => isOpen(a, progress[a.id])));
-  const nextConcept = focus[0];
-  const conceptCount = studies.reduce((n, s) => n + s.concepts.length, 0);
+  const notes = Object.values(lectures).filter((l) => !settings.excludedCourses.includes(l.courseCode)).sort(byDay);
+  const lastNote = notes.at(-1);
   const stats = courseStats(assignments, progress).filter((s) => s.average != null);
   const pts = assignments.filter((a) => a.score != null && a.points);
   const overall = pts.length ? Math.round((pts.reduce((n, a) => n + a.score!, 0) / pts.reduce((n, a) => n + a.points!, 0)) * 100) : null;
   const weakest = [...mastery].sort((a, b) => a.score - b.score)[0];
   const falling = stats.filter((s) => (s.trend ?? 0) <= -8);
   const newFinds = opps.filter((o) => o.status === "suggested").length;
+  const strain = burnoutRisk(checkins, plan, sessions, todayKey);
   const nextApp = sortPriority(opps.filter((o) => isToApply(o) && o.deadline && o.deadline >= torontoToday()))[0];
 
   return (
@@ -52,6 +56,15 @@ export default async function Today() {
 
       {isDemo() && <div className="banner">You&apos;re looking at sample courses. Add your Quercus token (CANVAS_TOKEN) to load yours.</div>}
 
+      <CheckInCard
+        key={checkin?.at ?? "none"}
+        done={!!checkin}
+        energy={checkin?.energy}
+        sleep={checkin?.sleep}
+        reply={checkin?.reply}
+        capacity={today.capacity}
+      />
+
       <AskHero />
 
       <section className="agents">
@@ -61,15 +74,11 @@ export default async function Today() {
           <span className="big">{PRESSURE_LABEL[plan.pressure]}</span>
           <span className="small">{fmtHours(plan.next7Hours)} of {fmtHours(plan.next7Capacity)} this week{plan.risks.length ? ` · ${plan.risks.length} at risk` : ""}</span>
         </Link>
-        <Link href={nextConcept ? `${studyHref(nextConcept.courseCode)}#${nextConcept.concept.id}` : "/study"} className="agent g-study">
+        <Link href={lastNote ? studyHref(lastNote.courseCode, lastNote.id) : "/study"} className="agent g-study">
           <span className="ico">✎</span>
           <span className="muted small">Study</span>
-          <span className="big">{focus.length ? `${focus.length} to understand` : conceptCount ? "All understood" : "Your classes"}</span>
-          <span className="small">
-            {nextConcept
-              ? `Next: ${nextConcept.concept.name}${nextConcept.assignment ? ` for ${nextConcept.assignment.name}` : ""}`
-              : "Record a class to build your notes and concepts"}
-          </span>
+          <span className="big">{notes.length ? `${notes.length} note${notes.length === 1 ? "" : "s"}` : "Your notes"}</span>
+          <span className="small">{lastNote ? `Latest: ${noteTitle(lastNote)}, ${lastNote.courseCode}` : "Take notes for each course"}</span>
         </Link>
         <Link href="/performance" className="agent g-perf">
           <span className="ico">↗</span>
@@ -78,6 +87,12 @@ export default async function Today() {
           <span className="small">
             {falling.length ? `${falling.map((s) => s.courseCode).join(", ")} slipping` : weakest ? `Weakest topic: ${weakest.topic} (${weakest.score}%)` : "Take a quiz to measure a topic"}
           </span>
+        </Link>
+        <Link href="/wellbeing" className={`agent g-well r-${strain.level}`}>
+          <span className="ico">♥</span>
+          <span className="muted small">Wellbeing agent</span>
+          <span className="big">{RISK_LABEL[strain.level]}</span>
+          <span className="small">{strain.drivers[0] ?? (checkins.length ? "Energy, sleep and workload look balanced" : "Check in to start tracking strain")}</span>
         </Link>
         <Link href="/careers" className="agent g-career">
           <span className="ico">◆</span>
@@ -99,20 +114,9 @@ export default async function Today() {
           {today.items.length === 0 ? (
             <p className="muted small" style={{ margin: 0 }}>Free day. Your planner left today open. Rest counts too.</p>
           ) : (
-            <div className="agenda">
-              {today.items.map((it) => (
-                <Link key={it.href + it.title} href={it.href}>
-                  <span className="h">{fmtHours(it.hours)}</span>
-                  <span>
-                    <strong>{it.title}</strong>
-                    <span className="muted small" style={{ display: "block" }}>{it.courseCode} · {it.name}</span>
-                  </span>
-                  <span className={`k ${it.kind}`}>{it.kind === "study" ? "Study" : "Assignment"}</span>
-                </Link>
-              ))}
-            </div>
+            <Agenda items={today.items} />
           )}
-          {today.note && <p className="muted small" style={{ margin: "10px 0 0" }}>Lighter day: {today.note}</p>}
+          {today.note && <p className="muted small" style={{ margin: "10px 0 0" }}>{today.note.startsWith("Lighter") ? today.note : `Lighter day: ${today.note}`}</p>}
         </div>
         <div className="card">
           <h2>Coming up</h2>

@@ -33,15 +33,13 @@ export interface RecorderHandle {
   start: () => void;
 }
 
-// Records in the background of the notes page. Before anything is recorded it shows a block
-// that invites you to start; while recording it's a small floating bar, like Granola's.
+// Records in the background of a note, started from the note's Record button. While
+// recording it's a small floating bar, like Granola's.
 export default function Recorder({
   ref,
   lectureId,
   offset,
   gemini,
-  inline,
-  extra,
   onLive,
   onSegments,
   onFinished,
@@ -50,8 +48,6 @@ export default function Recorder({
   lectureId: string;
   offset: number; // where this recording starts in the lecture (seconds already recorded)
   gemini: boolean;
-  inline: boolean; // show the "record this class" block (nothing recorded yet)
-  extra?: React.ReactNode; // shown under the start button in that block
   onLive: (live: boolean) => void;
   onSegments: (segments: Segment[], duration: number) => void;
   onFinished: () => void;
@@ -104,6 +100,10 @@ export default function Recorder({
   async function start() {
     setError("");
     const s = r.current;
+    if (!gemini && !speech()) {
+      setError("This browser has no live captions and there's no Gemini key, so nothing can be transcribed. Paste a transcript from the ⋯ menu instead.");
+      return;
+    }
     try {
       s.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     } catch (e) {
@@ -216,8 +216,7 @@ export default function Recorder({
 
   function startCaptions() {
     const s = r.current;
-    const W = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
-    const Impl = W.SpeechRecognition ?? W.webkitSpeechRecognition;
+    const Impl = speech();
     if (!Impl) return setCaptionsOn(false);
     const rec = new Impl();
     rec.continuous = true;
@@ -282,37 +281,16 @@ export default function Recorder({
   }
 
   const live = status === "recording" || status === "paused";
-  const how = gemini
-    ? "Put your laptop or phone near the speaker. Each minute is transcribed while class goes on, and type your own notes below if you like."
-    : captionsOn
-      ? "Transcribed with your browser's live captions. Add a Gemini key for a more accurate transcript."
-      : "This browser has no live captions and there's no Gemini key, so nothing can be transcribed. Paste a transcript instead.";
 
-  if (!live && status !== "finishing" && !failed) {
-    if (!inline)
-      return error ? (
-        <div className="rec-dock">
-          <div className="rec-pill" role="alert">
-            <span className="rec-sub">{error}</span>
-            <button type="button" onClick={() => setError("")}>OK</button>
-          </div>
-        </div>
-      ) : null;
-    return (
-      <div className="callout rec-start">
-        <span className="callout-ico" aria-hidden>🎙️</span>
-        <div>
-          <strong>Record this class</strong>
-          <p>{how}</p>
-          <div className="rec-start-row">
-            <button type="button" className="rec-go" onClick={start}><span className="rec-dot" /> Start recording</button>
-            {extra}
-          </div>
-          {error && <p className="doc-error">{error}</p>}
+  if (!live && status !== "finishing" && !failed)
+    return error ? (
+      <div className="rec-dock">
+        <div className="rec-pill" role="alert">
+          <span className="rec-sub">{error}</span>
+          <button type="button" onClick={() => setError("")}>OK</button>
         </div>
       </div>
-    );
-  }
+    ) : null;
 
   return (
     <div className="rec-dock" role="region" aria-label="Recording">
@@ -344,6 +322,12 @@ export default function Recorder({
       </div>
     </div>
   );
+}
+
+// The browser's live captions (Web Speech API), when it has them.
+function speech() {
+  const W = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
+  return W.SpeechRecognition ?? W.webkitSpeechRecognition;
 }
 
 function safe(f: () => void) {

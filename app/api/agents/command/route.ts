@@ -5,6 +5,7 @@ import { loadAll } from "@/lib/data";
 import { fmtHours, PRESSURE_LABEL } from "@/lib/planner";
 import { getSettings, saveSettings } from "@/lib/store";
 import { studyHref } from "@/lib/study";
+import { recordCheckIn } from "@/lib/agents/wellbeing";
 
 export const maxDuration = 60;
 
@@ -25,11 +26,15 @@ export async function POST(req: Request) {
     await saveSettings(result.settings);
     return NextResponse.json({ agent: "Planner", message: result.reply, href: "/plan" });
   }
+  if (r.agent === "checkin") {
+    const { checkin, capacity } = await recordCheckIn(r);
+    return NextResponse.json({ agent: "Wellbeing", message: `${checkin.reply} Today is now ${fmtHours(capacity)}.`, href: "/" });
+  }
   if (r.agent === "study") {
     const code = assignments.find((a) => a.courseCode.toLowerCase() === r.courseCode.toLowerCase())?.courseCode;
     return code
-      ? NextResponse.json({ agent: "Study", message: `Opening ${code}: its class notes and the concepts its work needs.`, href: studyHref(code) })
-      : NextResponse.json({ agent: "Study", message: "Opening Study. Pick a course to see its notes and concepts.", href: "/study" });
+      ? NextResponse.json({ agent: "Study", message: `Opening your ${code} notes.`, href: studyHref(code) })
+      : NextResponse.json({ agent: "Study", message: "Opening Study. Pick a course to see its notes.", href: "/study" });
   }
   if (r.agent === "quiz") {
     const q = new URLSearchParams({ course: r.courseCode, topic: r.topic });

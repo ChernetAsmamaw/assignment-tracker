@@ -19,6 +19,17 @@ export function formatDay(iso: string, long = false): string {
     : { timeZone: TZ, weekday: "short", month: "short", day: "numeric" });
 }
 
+// The calendar day of a moment in Toronto, as YYYY-MM-DD.
+export const dayOf = (at: string | number | Date = new Date()) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(at));
+
+export const isDay = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(`${s}T12:00:00Z`));
+
+// A YYYY-MM-DD day as "Mon, Oct 26", with the year when it isn't this year.
+export function formatDate(day: string, withYear = day.slice(0, 4) !== dayOf().slice(0, 4)): string {
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-CA", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", ...(withYear ? { year: "numeric" } : {}) });
+}
+
 export function relativeDue(dueAt: string | null): string {
   if (!dueAt) return "";
   const hours = (new Date(dueAt).getTime() - Date.now()) / 36e5;

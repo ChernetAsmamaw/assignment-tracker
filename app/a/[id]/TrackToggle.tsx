@@ -32,11 +32,11 @@ export default function TrackToggle({ id, courseCode, initial, courseOff }: { id
           <strong>Track this assignment</strong>
           <span className="small muted">
             {courseOff ? (
-              <>{courseCode} is unticked, so Pace leaves all of it out. <Link href="/courses">Choose courses</Link></>
+              <>{courseCode} is unticked, so Pace leaves all of it out. <Link href="/settings">Settings</Link></>
             ) : on ? (
-              "Shows up in your lists, planner, Study page and the morning email."
+              "Shows up in your morning email, lists, planner and Study."
             ) : (
-              "Left out of your lists, planner, Study page and the morning email."
+              "Left out of your morning email, lists, planner and Study."
             )}
           </span>
         </span>

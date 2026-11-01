@@ -3,20 +3,24 @@ import type { Metadata } from "next";
 import Shell from "@/components/Shell";
 import { cookies } from "next/headers";
 import { COOKIE, authToken } from "@/lib/auth";
-import { isDemo } from "@/lib/canvas";
+import { getAssignments, isDemo } from "@/lib/canvas";
 import { getIncludedAssignments } from "@/lib/data";
 import { courseColor } from "@/lib/colors";
+import { storageProblem } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: "Pace: your AI study team",
-  description: "Agents that plan your week, turn your classes into notes you can trace and help you understand the concepts behind your assignments, from your Quercus courses.",
+  description: "Agents that plan your week, keep your notes for each course and measure what you know, from your Quercus courses.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The login page shares this layout, so only load courses for a signed-in visitor.
   const pw = process.env.APP_PASSWORD;
   const signedIn = !pw || (await cookies()).get(COOKIE)?.value === (await authToken(pw));
-  const assignments = signedIn ? await getIncludedAssignments().catch(() => []) : [];
+  // Unticked courses stay out of the sidebar; if settings can't be read, show every course.
+  const [assignments, problem] = signedIn
+    ? await Promise.all([getIncludedAssignments().catch(() => getAssignments()).catch(() => []), storageProblem()])
+    : [[], null];
   const codes = [...new Set(assignments.map((a) => a.courseCode))].sort();
   const spaces = codes.map((code) => ({
     code,
@@ -31,7 +35,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <Shell spaces={spaces} signOut={!!process.env.APP_PASSWORD} demo={isDemo()}>{children}</Shell>
+        <Shell spaces={spaces} signOut={!!process.env.APP_PASSWORD} demo={isDemo()}>
+          {problem && <div className="banner" role="alert">{problem}</div>}
+          {children}
+        </Shell>
       </body>
     </html>
   );

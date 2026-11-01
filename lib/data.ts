@@ -1,10 +1,10 @@
 import { getAssignments } from "./canvas";
 import { getAllProgress, getSettings, listAll, type Settings } from "./store";
-import { buildPlan, isOpen } from "./planner";
-import { studyTasks, type CourseStudy } from "./study";
+import { buildPlan, dayKey } from "./planner";
 import { emptyProgress, type Assignment, type Mastery, type Progress } from "./types";
+import { capacityFactor, learnPace, paceFactors, type CheckIn, type FocusSession } from "./wellbeing";
 
-// Courses and assignments unticked on the Courses page drop out of every list, plan and email.
+// Courses and assignments unticked in Settings drop out of every list, plan and email.
 export const isIncluded = (a: Assignment, s: Settings) =>
   !s.excludedCourses.includes(a.courseCode) && !s.excludedAssignments.includes(a.id);
 
@@ -15,18 +15,33 @@ export async function getIncludedAssignments(): Promise<Assignment[]> {
 
 // Everything the planner needs, with saved progress filled out to the current shape.
 export async function loadAll() {
-  const [all, saved, settings, study, mastery] = await Promise.all([
+  const [all, saved, settings, mastery, checkinMap, focusMap] = await Promise.all([
     getAssignments(),
     getAllProgress(),
     getSettings(),
-    listAll<CourseStudy>("study"),
     listAll<Mastery>("mastery"),
+    listAll<CheckIn>("checkins"),
+    listAll<FocusSession>("focus"),
   ]);
-  const courseOn = (code: string) => !settings.excludedCourses.includes(code);
   const assignments = all.filter((a) => isIncluded(a, settings));
-  const studies = Object.values(study).filter((s) => courseOn(s.courseCode));
   const progress: Record<string, Progress> = {};
   for (const a of assignments) progress[a.id] = { ...emptyProgress(), ...saved[a.id] };
-  const plan = buildPlan(assignments, progress, settings, studyTasks(studies, assignments.filter((a) => isOpen(a, progress[a.id]))));
-  return { assignments, progress, settings, plan, studies, mastery: Object.values(mastery).filter((m) => courseOn(m.courseCode)) };
+  const today = dayKey(new Date());
+  const checkins = Object.values(checkinMap).sort((a, b) => a.date.localeCompare(b.date));
+  const sessions = Object.values(focusMap);
+  const checkin = checkinMap[today] ?? null;
+  const pace = learnPace(sessions);
+  const plan = buildPlan(assignments, progress, settings, {}, { pace: paceFactors(pace), today: capacityFactor(checkin) });
+  return {
+    assignments,
+    progress,
+    settings,
+    plan,
+    mastery: Object.values(mastery).filter((m) => !settings.excludedCourses.includes(m.courseCode)),
+    today,
+    checkin,
+    checkins,
+    sessions,
+    pace,
+  };
 }

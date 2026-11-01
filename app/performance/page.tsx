@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 
 export default async function PerformancePage({ searchParams }: { searchParams: Promise<{ course?: string; topic?: string }> }) {
   const q = await searchParams;
-  const { assignments, progress, studies, mastery } = await loadAll();
+  const { assignments, progress, mastery } = await loadAll();
   const stats = courseStats(assignments, progress).sort((a, b) => a.courseCode.localeCompare(b.courseCode));
-  const topics = topicsFor(studies, mastery);
+  const topics = topicsFor(mastery);
   const courses = stats.map((s) => s.courseCode);
   const ranked = [...mastery].sort((a, b) => a.score - b.score);
 
@@ -52,7 +52,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
         <div className="card">
           <h2>Topic mastery</h2>
           {ranked.length === 0 ? (
-            <p className="muted small" style={{ margin: 0 }}>Take a quiz to start measuring your proficiency. Quiz yourself on any concept from your Study pages.</p>
+            <p className="muted small" style={{ margin: 0 }}>Take a quiz to start measuring your proficiency.</p>
           ) : (
             ranked.map((m) => (
               <div key={m.key} className="mastery-row">

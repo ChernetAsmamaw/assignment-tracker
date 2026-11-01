@@ -1,8 +1,10 @@
+import { dayOf } from "./format";
 import { gemini, hasGemini } from "./gemini";
 
-// Class recorder: audio is transcribed in short chunks while the class runs, then the
-// notes are written only from the transcript. Every note keeps the ids of the transcript
-// segments it came from, so the page can show the source when you hover it.
+// A note in a course: what you type, plus an optional class recording. A recording is
+// transcribed in short chunks while the class runs, then notes are written only from the
+// transcript. Every written note keeps the ids of the transcript segments it came from,
+// so the page can show the source when you hover it.
 
 export interface Segment {
   id: string; // "s12", stable once written
@@ -29,9 +31,10 @@ export interface LectureNotes {
 
 export interface Lecture {
   id: string;
-  title: string;
+  title: string; // empty until you name it
   courseCode: string;
   createdAt: string;
+  date?: string; // YYYY-MM-DD the note is for; sets its place in the course's list. Older notes use createdAt.
   duration: number; // seconds recorded so far
   segments: Segment[];
   notes: LectureNotes | null;
@@ -47,15 +50,32 @@ export interface LectureMine {
   checked: string[]; // to-dos from the notes you've ticked off, by text
 }
 
-export const newLecture = (title: string, courseCode: string): Lecture => ({
+export const newLecture = (title: string, courseCode: string, date = dayOf()): Lecture => ({
   id: `lec-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-  title: title.trim() || "Lecture",
+  title: title.trim(),
   courseCode: courseCode.trim(),
   createdAt: new Date().toISOString(),
+  date,
   duration: 0,
   segments: [],
   notes: null,
 });
+
+export const noteDay = (l: Pick<Lecture, "date" | "createdAt">) => l.date ?? dayOf(l.createdAt);
+
+// Oldest first; notes on the same day stay in the order they were made.
+export const byDay = (a: Pick<Lecture, "date" | "createdAt">, b: Pick<Lecture, "date" | "createdAt">) =>
+  noteDay(a).localeCompare(noteDay(b)) || a.createdAt.localeCompare(b.createdAt);
+
+export const noteTitle = (l: Pick<Lecture, "title">) => l.title.trim() || "Untitled";
+
+// The first line of what you wrote, or of the written notes, for lists.
+export function notePreview(l: Lecture, mine?: string): string {
+  const first = (mine ?? l.myNotes ?? "").split("\n").map((x) => x.trim()).find(Boolean);
+  if (first) return first.slice(0, 160);
+  if (l.notes?.summary[0]) return l.notes.summary[0].text;
+  return l.segments.length ? `Recorded ${clock(l.duration)}, notes not written yet` : "";
+}
 
 export const clock = (sec: number) => {
   const s = Math.max(0, Math.floor(sec));
@@ -179,7 +199,7 @@ export async function writeNotes(lecture: Lecture): Promise<LectureNotes> {
       const { data } = await gemini<Omit<LectureNotes, "ai" | "dropped" | "generatedAt" | "segmentCount">>({
         system: NOTE_TAKER,
         prompt:
-          `Class: ${lecture.courseCode || "unknown course"}, "${lecture.title}".\n\nTranscript, one segment per line as [id time] text:\n${transcript}${mine}\n\n` +
+          `Class: ${lecture.courseCode || "unknown course"}, "${noteTitle(lecture)}".\n\nTranscript, one segment per line as [id time] text:\n${transcript}${mine}\n\n` +
           "Write notes from this transcript.\n" +
           "summary: 3 to 5 sentences on what the class covered and the main takeaways.\n" +
           "sections: the topics in the order they came up, each with a short heading and 2 to 8 concise bullets " +

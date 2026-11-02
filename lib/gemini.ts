@@ -21,6 +21,7 @@ interface GeminiOptions {
   temperature?: number;
   fast?: boolean; // short, simple tasks: start with the Flash-Lite models
   audio?: { mimeType: string; data: string }; // base64 audio sent alongside the prompt
+  timeout?: number; // ms for the whole call, every model tried included (default 26 s, for a 60 s function)
 }
 
 export interface GeminiResult<T> {
@@ -40,6 +41,7 @@ export async function gemini<T>(opts: GeminiOptions): Promise<GeminiResult<T>> {
   }
 
   const started = Date.now();
+  const budget = opts.timeout ?? 26_000;
   const send = (model: string) =>
     fetch(`${ENDPOINT}/${model}:generateContent`, {
       method: "POST",
@@ -51,7 +53,7 @@ export async function gemini<T>(opts: GeminiOptions): Promise<GeminiResult<T>> {
         ...(opts.search ? { tools: [{ google_search: {} }] } : {}),
         ...(opts.functions ? { tools: [{ functionDeclarations: opts.functions }] } : {}),
       }),
-      signal: AbortSignal.timeout(Math.max(5_000, 26_000 - (Date.now() - started))),
+      signal: AbortSignal.timeout(Math.max(5_000, budget - (Date.now() - started))),
       cache: "no-store",
     });
 
@@ -59,7 +61,7 @@ export async function gemini<T>(opts: GeminiOptions): Promise<GeminiResult<T>> {
   const chain = opts.fast ? [...FAST, ...SMART] : [...SMART, ...FAST];
   let res: Response | null = null;
   for (const model of chain) {
-    if (res && Date.now() - started > 20_000) break;
+    if (res && Date.now() - started > budget - 6_000) break;
     res = await send(model);
     if (![403, 404, 429, 500, 503].includes(res.status)) break;
   }

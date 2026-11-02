@@ -2,9 +2,10 @@ import { dayOf } from "./format";
 import { gemini, hasGemini } from "./gemini";
 
 // A note in a course: what you type, plus an optional class recording. A recording is
-// transcribed in short chunks while the class runs, then notes are written only from the
-// transcript. Every written note keeps the ids of the transcript segments it came from,
-// so the page can show the source when you hover it.
+// transcribed in short chunks while the class runs, and notes are written only from the
+// transcript (lib/class-notes.ts): part by part during a long class, then finished at the end.
+// Every written note keeps the ids of the transcript segments it came from, so the page can
+// show the source when you hover it.
 
 export interface Segment {
   id: string; // "s12", stable once written
@@ -14,24 +15,74 @@ export interface Segment {
 }
 
 export interface SourcedLine {
-  text: string;
+  text: string; // may use **bold** and `code`
   sources: string[]; // segment ids
 }
 
+// A line of the notes that can have points under it, and be flagged as test material.
+export interface NotePoint extends SourcedLine {
+  exam?: boolean; // the lecturer said it's on a test, or stressed it
+  sub?: SourcedLine[];
+}
+
+export interface NoteSection {
+  heading: string;
+  bullets: NotePoint[];
+}
+
+export interface Term {
+  term: string;
+  definition: string;
+  sources: string[];
+}
+
+export interface Question {
+  question: string;
+  answer: string;
+  sources: string[];
+}
+
 export interface LectureNotes {
-  summary: SourcedLine[];
-  sections: { heading: string; bullets: SourcedLine[] }[];
+  summary: SourcedLine[]; // "In short"
+  takeaways?: NotePoint[]; // the few ideas worth memorizing (notes written before these existed have none)
+  sections: NoteSection[];
   actions: SourcedLine[]; // deadlines, readings, things to do that were said in class
-  terms: { term: string; definition: string; sources: string[] }[];
+  terms: Term[];
+  questions?: Question[]; // to test yourself with
+  edited?: boolean; // you changed or added lines; the lines you added have no sources
   ai: boolean;
   dropped: number; // notes thrown away because they had no source in the transcript
   generatedAt: string;
   segmentCount: number; // transcript length the notes were written from
 }
 
+// Notes for one stretch of a long class (up to 10 minutes), written while it's still being
+// recorded. When the class ends, the finished notes are put together from the parts, so they
+// take seconds instead of a pass over the whole transcript.
+export interface NotePart {
+  first: string; // the transcript segments it covers: the ids of the first and last,
+  last: string;
+  sig: string; // and a fingerprint of every id in between
+  from: number; // seconds
+  to: number;
+  sections: NoteSection[];
+  terms: Term[];
+  actions: SourcedLine[];
+  dropped: number;
+  writtenAt: string;
+}
+
+// A note's parts are saved apart from it, so writing one never overwrites transcript lines
+// being saved at the same moment.
+export interface LectureParts {
+  parts: NotePart[];
+  title?: string; // a title for the class so far, from the latest part
+}
+
 export interface Lecture {
   id: string;
-  title: string; // empty until you name it
+  title: string; // empty until you name it, or Pace names it from what's on the page
+  titleAuto?: boolean; // the title was picked from the content, so a better pick can replace it
   courseCode: string;
   createdAt: string;
   date?: string; // YYYY-MM-DD the note is for; sets its place in the course's list. Older notes use createdAt.
@@ -73,9 +124,13 @@ export const noteTitle = (l: Pick<Lecture, "title">) => l.title.trim() || "Untit
 export function notePreview(l: Lecture, mine?: string): string {
   const first = (mine ?? l.myNotes ?? "").split("\n").map((x) => x.trim()).find(Boolean);
   if (first) return first.slice(0, 160);
-  if (l.notes?.summary[0]) return l.notes.summary[0].text;
+  const line = l.notes?.summary[0] ?? l.notes?.takeaways?.[0] ?? l.notes?.sections[0]?.bullets[0];
+  if (line) return plain(line.text);
   return l.segments.length ? `Recorded ${clock(l.duration)}, notes not written yet` : "";
 }
+
+// A note line without its Markdown marks.
+export const plain = (text: string) => text.replace(/\*\*|`/g, "");
 
 export const clock = (sec: number) => {
   const s = Math.max(0, Math.floor(sec));
@@ -174,126 +229,193 @@ export function segmentsFromText(text: string): Omit<Segment, "id">[] {
   return filled.map((r, i) => ({ start: r.start, end: filled[i + 1]?.start ?? round(t), text: r.text.slice(0, 1200) }));
 }
 
-// ---------- Notes ----------
+// ---------- Notes, part by part ----------
 
-const NOTE_TAKER =
-  "You write class notes for a university student, like a careful note-taker who was in the room. " +
-  "You may only use what the transcript says: no outside facts, no examples the lecturer didn't give, no filling gaps. " +
-  "Every note must list the ids of the transcript segments that support it. If something isn't in the transcript, leave it out.";
+export const PART_SECONDS = 600; // a long class gets notes for every 10 minutes while it records
+export const ONE_GO_SECONDS = 25 * 60; // a transcript up to this long is written up in one go
 
-const sourced = {
-  type: "OBJECT",
-  properties: { text: { type: "STRING" }, sources: { type: "ARRAY", items: { type: "STRING" } } },
-  required: ["text", "sources"],
-};
+export interface NoteWindow {
+  first: string;
+  last: string;
+  sig: string;
+  from: number;
+  to: number;
+  ready: boolean; // the class has moved past it, so its notes won't stop mid-thought
+}
 
-export async function writeNotes(lecture: Lecture): Promise<LectureNotes> {
-  const segs = lecture.segments;
-  const base = { generatedAt: new Date().toISOString(), segmentCount: segs.length };
-  if (hasGemini() && segs.length) {
-    try {
-      const transcript = segs.map((s) => `[${s.id} ${clock(s.start)}] ${s.text}`).join("\n").slice(0, 400_000);
-      const mine = lecture.myNotes?.trim()
-        ? `\n\nThe student's own rough notes from class. Use them to judge what mattered to them and cover those points, but every note still needs transcript sources:\n${lecture.myNotes.trim().slice(0, 6000)}`
-        : "";
-      const { data } = await gemini<Omit<LectureNotes, "ai" | "dropped" | "generatedAt" | "segmentCount">>({
-        system: NOTE_TAKER,
-        prompt:
-          `Class: ${lecture.courseCode || "unknown course"}, "${noteTitle(lecture)}".\n\nTranscript, one segment per line as [id time] text:\n${transcript}${mine}\n\n` +
-          "Write notes from this transcript.\n" +
-          "summary: 3 to 5 sentences on what the class covered and the main takeaways.\n" +
-          "sections: the topics in the order they came up, each with a short heading and 2 to 8 concise bullets " +
-          "(definitions, steps, examples, formulas, anything the lecturer stressed or said would be on a test).\n" +
-          "actions: deadlines, readings, assignments, exam info or other things the student was told to do. Empty if none.\n" +
-          "terms: key terms the lecturer defined, with the definition as they gave it. Empty if none.\n" +
-          "For every item, sources is the list of segment ids (like s4) whose words support it, usually 1 to 3.",
-        temperature: 0.2,
-        schema: {
-          type: "OBJECT",
-          properties: {
-            summary: { type: "ARRAY", items: sourced },
-            sections: {
-              type: "ARRAY",
-              items: { type: "OBJECT", properties: { heading: { type: "STRING" }, bullets: { type: "ARRAY", items: sourced } }, required: ["heading", "bullets"] },
-            },
-            actions: { type: "ARRAY", items: sourced },
-            terms: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: { term: { type: "STRING" }, definition: { type: "STRING" }, sources: { type: "ARRAY", items: { type: "STRING" } } },
-                required: ["term", "definition", "sources"],
-              },
-            },
-          },
-          required: ["summary", "sections", "actions", "terms"],
-        },
-      });
-      return { ...ground(data, segs), ai: true, ...base };
-    } catch (e) {
-      console.error("lecture notes", e);
+// How long a transcript runs, from its first line to its last.
+export const span = (segs: Segment[]) => (segs.length ? segs[segs.length - 1].end - segs[0].start : 0);
+
+// A short fingerprint of which transcript segments a part was written from.
+function fingerprint(segs: Segment[]): string {
+  const ids = segs.map((s) => s.id).join(" ");
+  let h = 0x811c9dc5;
+  for (let i = 0; i < ids.length; i++) h = Math.imul(h ^ ids.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(36);
+}
+
+// The parts that still match the transcript, in order. A minute of audio that's sent again
+// gets new segment ids, so the part written from the old ones no longer counts.
+export function currentParts(parts: NotePart[], segs: Segment[]): NotePart[] {
+  const at = new Map(segs.map((s, i) => [s.id, i]));
+  const out: NotePart[] = [];
+  let end = -1;
+  for (const p of [...parts].sort((a, b) => (at.get(a.first) ?? -1) - (at.get(b.first) ?? -1))) {
+    const a = at.get(p.first);
+    const b = at.get(p.last);
+    if (a == null || b == null || a <= end || b < a || fingerprint(segs.slice(a, b + 1)) !== p.sig) continue;
+    out.push(p);
+    end = b;
+  }
+  return out;
+}
+
+// The stretches of transcript that have no notes yet, in order, each up to 10 minutes long.
+export function openWindows(segs: Segment[], parts: NotePart[]): NoteWindow[] {
+  const at = new Map(segs.map((s, i) => [s.id, i]));
+  const covered = new Array<boolean>(segs.length).fill(false);
+  for (const p of currentParts(parts, segs)) covered.fill(true, at.get(p.first)!, at.get(p.last)! + 1);
+  const out: NoteWindow[] = [];
+  for (let i = 0; i < segs.length; i++) {
+    if (covered[i]) continue;
+    let j = i;
+    while (j + 1 < segs.length && !covered[j + 1] && segs[j + 1].start < segs[i].start + PART_SECONDS) j++;
+    out.push({ first: segs[i].id, last: segs[j].id, sig: fingerprint(segs.slice(i, j + 1)), from: segs[i].start, to: segs[j].end, ready: j + 1 < segs.length });
+    i = j;
+  }
+  return out;
+}
+
+// The next stretch that's ready for notes, if any.
+export const nextWindow = (segs: Segment[], parts: NotePart[]) => openWindows(segs, parts).find((w) => w.ready) ?? null;
+
+// Adds a newly written part in place of any part it overlaps.
+export function addPart(parts: NotePart[], part: NotePart, segs: Segment[]): NotePart[] {
+  const at = new Map(segs.map((s, i) => [s.id, i]));
+  const a = at.get(part.first) ?? -1;
+  const b = at.get(part.last) ?? -1;
+  const kept = currentParts(parts, segs).filter((p) => at.get(p.last)! < a || at.get(p.first)! > b);
+  return currentParts([...kept, part], segs);
+}
+
+// Two names for the same thing, give or take case, accents and punctuation.
+export const same = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+// The parts as one set of notes: sections with the same heading join up, wherever in the
+// class they came, and a term or to-do said twice is kept once.
+export function stitch(parts: Pick<NotePart, "sections" | "terms" | "actions">[]): Pick<LectureNotes, "sections" | "terms" | "actions"> {
+  const sections: NoteSection[] = [];
+  const named = new Map<string, NoteSection>();
+  for (const s of parts.flatMap((p) => p.sections)) {
+    const have = named.get(same(s.heading));
+    if (have) have.bullets.push(...s.bullets);
+    else {
+      const section = { heading: s.heading, bullets: [...s.bullets] };
+      named.set(same(s.heading), section);
+      sections.push(section);
     }
   }
-  return { ...extractive(segs), ai: false, ...base };
-}
-
-// Keeps only citations that point at real segments, and drops any note left without one.
-function ground(data: Partial<Omit<LectureNotes, "ai">>, segs: Segment[]) {
-  const ids = new Set(segs.map((s) => s.id));
-  let dropped = 0;
-  const fix = (sources: unknown) => [...new Set((Array.isArray(sources) ? sources : []).map((s) => String(s).trim().replace(/^\[|\]$/g, "")).filter((s) => ids.has(s)))];
-  const lines = (list: unknown): SourcedLine[] =>
-    (Array.isArray(list) ? list : []).flatMap((l: SourcedLine) => {
-      const sources = fix(l?.sources);
-      const text = String(l?.text ?? "").trim();
-      if (!text) return [];
-      if (!sources.length) return (dropped++, []);
-      return [{ text, sources }];
-    });
-  const sections = (data.sections ?? [])
-    .map((s) => ({ heading: String(s?.heading ?? "").trim() || "Notes", bullets: lines(s?.bullets) }))
-    .filter((s) => s.bullets.length);
-  const terms = (data.terms ?? []).flatMap((t) => {
-    const sources = fix(t?.sources);
-    if (!t?.term) return [];
-    if (!sources.length) return (dropped++, []);
-    return [{ term: String(t.term).trim(), definition: String(t.definition ?? "").trim(), sources }];
-  });
-  return { summary: lines(data.summary), sections, actions: lines(data.actions), terms, dropped };
-}
-
-// Without Gemini: pick the most content-heavy sentences, in order, each quoting its own segment.
-const STOP = new Set(
-  "the a an and or but so of to in on at for with is are was were be been this that these those it its we you they i he she um uh like just okay right yeah going gonna do does did have has had not if then there here what which who how can will would should could about as by from up out all one".split(" "),
-);
-const ACTION = /\b(due|deadline|assignment|homework|read(ing)?|chapter|quiz|midterm|exam|test|submit|office hours|next (week|class|lecture)|problem set|lab)\b/i;
-
-function extractive(segs: Segment[]) {
-  const words = (t: string) => t.toLowerCase().match(/[a-z][a-z'-]{2,}/g)?.filter((w) => !STOP.has(w)) ?? [];
-  const freq = new Map<string, number>();
-  for (const s of segs) for (const w of words(s.text)) freq.set(w, (freq.get(w) ?? 0) + 1);
-  const score = (s: Segment) => {
-    const w = words(s.text);
-    return w.length < 4 ? 0 : w.reduce((n, x) => n + (freq.get(x) ?? 0), 0) / Math.sqrt(w.length);
-  };
-  const ranked = [...segs].sort((a, b) => score(b) - score(a));
-  const line = (s: Segment): SourcedLine => ({ text: s.text, sources: [s.id] });
-  const byTime = (a: Segment, b: Segment) => a.start - b.start;
-
-  // Sections: split the class into roughly 10 minute blocks and keep the strongest lines of each.
-  const sections: LectureNotes["sections"] = [];
-  const block = 600;
-  const last = segs.at(-1)?.end ?? 0;
-  for (let t = 0; t <= last; t += block) {
-    const inBlock = segs.filter((s) => s.start >= t && s.start < t + block);
-    const top = [...inBlock].sort((a, b) => score(b) - score(a)).slice(0, 5).filter((s) => score(s) > 0).sort(byTime);
-    if (top.length) sections.push({ heading: `${clock(t)} – ${clock(Math.min(last, t + block))}`, bullets: top.map(line) });
+  const terms = new Map<string, Term>();
+  for (const t of parts.flatMap((p) => p.terms)) {
+    const have = terms.get(same(t.term));
+    if (have) have.sources = [...new Set([...have.sources, ...t.sources])];
+    else terms.set(same(t.term), { ...t });
   }
+  const actions = new Map<string, SourcedLine>();
+  for (const a of parts.flatMap((p) => p.actions)) if (!actions.has(same(a.text))) actions.set(same(a.text), a);
+  return { sections, terms: [...terms.values()], actions: [...actions.values()] };
+}
+
+// What the parts written so far add up to, shown while the class is still going.
+export function draftNotes(parts: NotePart[]): LectureNotes {
   return {
-    summary: ranked.slice(0, 4).filter((s) => score(s) > 0).sort(byTime).map(line),
+    summary: [],
+    ...stitch(parts),
+    ai: true,
+    dropped: parts.reduce((n, p) => n + p.dropped, 0),
+    generatedAt: parts.at(-1)?.writtenAt ?? "",
+    segmentCount: 0,
+  };
+}
+
+// ---------- Your edits ----------
+
+// The class notes as you edited them, checked before they're saved. Gemini's lines keep the
+// sources they had; a line you add has none. How and when the notes were written stays as it was.
+export function editedNotes(raw: unknown, prev: LectureNotes, segments: Segment[]): LectureNotes {
+  const ids = new Set(segments.map((s) => s.id));
+  const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  const list = (v: unknown, max: number) => (Array.isArray(v) ? v.slice(0, max).map(obj) : []);
+  const text = (v: unknown, max = 2000) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+  const sources = (v: unknown) => (Array.isArray(v) ? [...new Set(v.map(String).filter((id) => ids.has(id)))].slice(0, 20) : []);
+  const line = (r: Record<string, unknown>): SourcedLine[] => {
+    const t = text(r.text);
+    return t ? [{ text: t, sources: sources(r.sources) }] : [];
+  };
+  const point = (r: Record<string, unknown>): NotePoint[] => {
+    const [l] = line(r);
+    if (!l) return [];
+    const sub = list(r.sub, 30).flatMap(line);
+    return [{ ...l, ...(r.exam === true ? { exam: true } : {}), ...(sub.length ? { sub } : {}) }];
+  };
+  const o = obj(raw);
+  return {
+    ...prev,
+    summary: list(o.summary, 30).flatMap(line),
+    takeaways: list(o.takeaways, 40).flatMap(point),
+    actions: list(o.actions, 60).flatMap(line),
+    sections: list(o.sections, 80).flatMap((s) => {
+      const bullets = list(s.bullets, 200).flatMap(point);
+      return bullets.length ? [{ heading: text(s.heading, 200) || "Notes", bullets }] : [];
+    }),
+    terms: list(o.terms, 150).flatMap((t) => {
+      const term = text(t.term, 200);
+      return term ? [{ term, definition: text(t.definition), sources: sources(t.sources) }] : [];
+    }),
+    questions: list(o.questions, 60).flatMap((q) => {
+      const question = text(q.question, 600);
+      return question ? [{ question, answer: text(q.answer), sources: sources(q.sources) }] : [];
+    }),
+    edited: true,
+  };
+}
+
+// New notes for a class keep the lines you added to the old ones (lines without a source), each
+// in the same part of the notes and under the same heading where there is one. Your changes to
+// Gemini's own lines are replaced with the new notes.
+export function keepYours(old: LectureNotes | null | undefined, notes: LectureNotes): LectureNotes {
+  const yours = <T extends { sources: string[] }>(lines: T[] | undefined) => (lines ?? []).filter((x) => !x.sources.length);
+  if (!old) return notes;
+  const sections = notes.sections.map((s) => ({ ...s, bullets: [...s.bullets] }));
+  let kept = 0;
+  for (const s of old.sections) {
+    const mine = yours(s.bullets);
+    if (!mine.length) continue;
+    kept += mine.length;
+    const have = sections.find((x) => same(x.heading) === same(s.heading));
+    if (have) have.bullets.push(...mine);
+    else sections.push({ heading: s.heading, bullets: mine });
+  }
+  const summary = yours(old.summary);
+  const takeaways = yours(old.takeaways);
+  const actions = yours(old.actions).filter((a) => !notes.actions.some((x) => same(x.text) === same(a.text)));
+  const terms = yours(old.terms).filter((t) => !notes.terms.some((x) => same(x.term) === same(t.term)));
+  const questions = yours(old.questions);
+  kept += summary.length + takeaways.length + actions.length + terms.length + questions.length;
+  if (!kept) return notes;
+  return {
+    ...notes,
+    summary: [...notes.summary, ...summary],
+    takeaways: [...(notes.takeaways ?? []), ...takeaways],
+    actions: [...notes.actions, ...actions],
     sections,
-    actions: segs.filter((s) => ACTION.test(s.text)).slice(0, 8).map(line),
-    terms: [],
-    dropped: 0,
+    terms: [...notes.terms, ...terms],
+    questions: [...(notes.questions ?? []), ...questions],
+    edited: true,
   };
 }

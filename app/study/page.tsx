@@ -1,18 +1,25 @@
 import Link from "next/link";
 import { Crumbs } from "@/components/Doc";
-import { getAssignments } from "@/lib/canvas";
 import { courseColor } from "@/lib/colors";
 import { formatDate } from "@/lib/format";
 import { byDay, noteDay, notePreview, noteTitle, type Lecture, type LectureMine } from "@/lib/lectures";
-import { listAll } from "@/lib/store";
+import { getIncludedAssignments } from "@/lib/data";
+import { getSettings, listAll } from "@/lib/store";
 import { courseTitle, studyHref } from "@/lib/study";
 import NewNote from "./NewNote";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudyPage() {
-  const [assignments, all, mine] = await Promise.all([getAssignments(), listAll<Lecture>("lectures"), listAll<LectureMine>("lecturemine")]);
-  const notes = Object.values(all).sort(byDay);
+  const [assignments, all, mine, settings] = await Promise.all([
+    getIncludedAssignments(),
+    listAll<Lecture>("lectures"),
+    listAll<LectureMine>("lecturemine"),
+    getSettings(),
+  ]);
+  const notes = Object.values(all)
+    .filter((l) => !settings.excludedCourses.includes(l.courseCode))
+    .sort(byDay);
   const codes = [...new Set([...assignments.map((a) => a.courseCode), ...notes.map((l) => l.courseCode)])].filter(Boolean).sort();
   const recent = [...notes].reverse().slice(0, 6);
 

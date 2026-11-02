@@ -152,9 +152,12 @@ export interface Settings {
   weekendHours: number;
   // Per-day study hours set by the Planner agent, e.g. { "2026-10-20": 1 } for a work shift.
   overrides: Record<string, { hours: number; reason: string }>;
+  // Course codes and assignment ids unticked in Settings; Pace leaves them out everywhere.
+  excludedCourses: string[];
+  excludedAssignments: string[];
 }
 
-export const DEFAULT_SETTINGS: Settings = { weekdayHours: 4, weekendHours: 3, overrides: {} };
+export const DEFAULT_SETTINGS: Settings = { weekdayHours: 4, weekendHours: 3, overrides: {}, excludedCourses: [], excludedAssignments: [] };
 
 export async function getSettings(): Promise<Settings> {
   const s = kv ? await kv.get<Settings>("settings") : await readData<Settings>("settings");

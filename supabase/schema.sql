@@ -2,7 +2,7 @@
 -- paste all of this in and click Run. Running it again is safe.
 
 create table if not exists public.pace (
-  collection text not null,  -- what kind of item: lectures, progress, checkins, kv, ...
+  collection text not null,  -- what kind of item: lectures, progress, mastery, kv, ...
   id text not null,          -- the item's id in its collection
   value text not null,       -- the item, as JSON
   expires_at timestamptz,    -- when a cached AI answer runs out (empty for everything else)

@@ -4,6 +4,7 @@ import Shell from "@/components/Shell";
 import { cookies } from "next/headers";
 import { COOKIE, authToken } from "@/lib/auth";
 import { getAssignments, isDemo } from "@/lib/canvas";
+import { getIncludedAssignments } from "@/lib/data";
 import { courseColor } from "@/lib/colors";
 import { storageProblem } from "@/lib/store";
 
@@ -16,7 +17,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // The login page shares this layout, so only load courses for a signed-in visitor.
   const pw = process.env.APP_PASSWORD;
   const signedIn = !pw || (await cookies()).get(COOKIE)?.value === (await authToken(pw));
-  const [assignments, problem] = signedIn ? await Promise.all([getAssignments().catch(() => []), storageProblem()]) : [[], null];
+  // Unticked courses stay out of the sidebar; if settings can't be read, show every course.
+  const [assignments, problem] = signedIn
+    ? await Promise.all([getIncludedAssignments().catch(() => getAssignments()).catch(() => []), storageProblem()])
+    : [[], null];
   const codes = [...new Set(assignments.map((a) => a.courseCode))].sort();
   const spaces = codes.map((code) => ({
     code,

@@ -16,8 +16,8 @@ const PINS = [
   { href: "/plan", label: "Planner", ico: "◷", bg: "linear-gradient(135deg,#5b4cf5,#9a6bff)" },
   { href: "/study", label: "Study", ico: "✎", bg: "linear-gradient(135deg,#e85dc0,#ff7a9a)" },
   { href: "/performance", label: "Performance", ico: "↗", bg: "linear-gradient(135deg,#1f9d8a,#3fc1a5)" },
-  { href: "/wellbeing", label: "Wellbeing", ico: "♥", bg: "linear-gradient(135deg,#e0527a,#ff9a7a)" },
   { href: "/careers", label: "Internships", ico: "◆", bg: "linear-gradient(135deg,#2f6fed,#4cc3f5)" },
+  { href: "/settings", label: "Settings", ico: "⚙", bg: "linear-gradient(135deg,#6b7280,#a1a1aa)" },
 ];
 
 function Spaces({ spaces }: { spaces: Space[] }) {
@@ -80,7 +80,7 @@ export default function Shell({ spaces, signOut, demo, children }: { spaces: Spa
             </Link>
           ))}
         </nav>
-        <div className="side-label">Spaces</div>
+        <div className="side-label">Spaces <Link href="/settings" className={path === "/settings" ? "on" : ""}>Choose</Link></div>
         <Suspense fallback={null}><Spaces spaces={spaces} /></Suspense>
         <div className="side-foot">
           <span>{demo ? "Sample data" : "Synced with Quercus"}</span>

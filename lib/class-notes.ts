@@ -5,6 +5,7 @@ import {
   addPart,
   clock,
   currentParts,
+  markdownLines,
   openWindows,
   same,
   span,
@@ -522,9 +523,8 @@ const cleanTitle = (v: unknown) =>
 
 // A title without Gemini: a short first line of your notes, or the terms the class used most.
 export function guessTitle(l: Pick<Lecture, "myNotes" | "segments" | "notes">): string {
-  const first = l.myNotes
-    ?.split("\n")
-    .map((x) => x.replace(/^\s*(?:#+|[-*•]|\d+[.)])\s*/, "").trim())
+  const first = markdownLines(l.myNotes ?? "")
+    .map((x) => x.replace(/^•\s*/, ""))
     .find(Boolean);
   const length = first?.split(/\s+/).length ?? 0;
   if (first && length <= 6 && !/[.?!,;:]$/.test(first)) return cleanTitle(first);

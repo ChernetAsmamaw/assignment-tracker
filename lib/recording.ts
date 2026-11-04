@@ -1,12 +1,15 @@
 import { useSyncExternalStore } from "react";
 import { saveChunk, wavBlob } from "./audio-store";
+import { LiveCaptions, type FromWorker } from "./live-captions";
 import { nextWindow, span, ONE_GO_SECONDS, type LectureNotes, type NotePart, type NoteWindow, type Segment } from "./lectures";
 
 // A class recording runs here, outside any page, so it keeps going while you open other pages of
 // Pace: the recorder (components/RecordingDock) floats over every page, and the note shows what's
 // been written when you go back to it. Audio is cut into one-minute chunks that are sent in order
 // to be transcribed, notes for every finished 10 minutes are written while the class goes on, and
-// after Stop the notes are finished whichever page is open.
+// after Stop the notes are finished whichever page is open. While it records, live captions show
+// what's being said, word by word: worked out on this device (lib/live-captions), or by the
+// browser while those get ready or where they can't run.
 
 const RATE = 16000;
 const CHUNK_SECONDS = 60; // one upload and one transcription per minute of class
@@ -36,7 +39,8 @@ export interface RecState {
   title: string; // a title from the notes so far, shown until the notes are finished
   pending: number; // minutes waiting to be sent
   stalled: boolean; // sending failed a few times; the audio is safe on this device
-  captions: boolean; // the browser is captioning what it hears
+  captions: "" | "device" | "browser"; // what's captioning what it hears, if anything
+  captionsLoading: number | null; // how far the captions on this device are from ready, 0 to 1
   error: string; // why recording couldn't start, or stopped early
   done: Finished | null;
   failed: string; // why the notes couldn't be written
@@ -46,15 +50,15 @@ export interface RecState {
 export interface Meter {
   elapsed: number; // seconds recorded this time
   level: number; // 0 to 1
-  heard: { t: number; text: string }[]; // the browser's captions of what isn't in the transcript yet
-  now: string; // what it's hearing this moment
+  heard: { t: number; text: string }[]; // the live captions of what isn't in the transcript yet
+  now: string; // the sentence being said, so far
 }
 
 interface Job {
   offset: number;
   length: number;
   blob: Blob;
-  captions: string;
+  cues: { start: number; text: string }[]; // the live captions of this minute, seconds into it
   tries: number;
 }
 
@@ -83,7 +87,8 @@ const IDLE: RecState = {
   title: "",
   pending: 0,
   stalled: false,
-  captions: false,
+  captions: "",
+  captionsLoading: null,
   error: "",
   done: null,
   failed: "",
@@ -98,6 +103,7 @@ const fresh = () => ({
   stream: null as MediaStream | null,
   proc: null as ScriptProcessorNode | null,
   recog: null as Recognition | null,
+  live: null as LiveCaptions | null,
   wake: null as { release(): Promise<void> } | null,
   pieces: [] as Int16Array[],
   chunkSamples: 0,
@@ -106,10 +112,14 @@ const fresh = () => ({
   peak: 0,
   drawn: 0,
   captions: [] as { t: number; text: string }[], // sent with each minute, for when there's no Gemini
+  browserHeard: false, // the browser's captions have heard something
+  covered: 0, // seconds into the class that have come back transcribed
   queue: [] as Job[],
   sending: false,
+  last: false, // the last minute is cut, after Stop
   gemini: false,
 });
+type Rec = ReturnType<typeof fresh>;
 
 class Recorder {
   state = IDLE;
@@ -150,10 +160,10 @@ class Recorder {
 
   async start(o: { id: string; href: string; name: string; base: number; segments: Segment[]; parts: NotePart[]; gemini: boolean }) {
     if (this.starting || ACTIVE.includes(this.state.status)) return; // one class at a time
-    if (!o.gemini && !speech())
+    if (!o.gemini && !speech() && !LiveCaptions.supported())
       return this.set({
         ...IDLE,
-        error: "This browser has no live captions and there's no Gemini key, so nothing can be transcribed. Paste a transcript from the ⋯ menu instead.",
+        error: "This browser can't caption what it hears and there's no Gemini key, so nothing can be transcribed. Paste a transcript from the ⋯ menu instead.",
       });
     this.starting = true;
     let stream: MediaStream;
@@ -188,6 +198,7 @@ class Recorder {
     if (this.state.status !== "recording") return;
     const ratio = rate / RATE;
     const out = new Int16Array(Math.ceil((input.length - a.carry) / ratio));
+    const heard = a.live ? new Float32Array(out.length) : null; // for the live captions
     let pos = a.carry;
     let n = 0;
     let sq = 0;
@@ -198,11 +209,13 @@ class Recorder {
       for (let i = i0; i < i1; i++) sum += input[i];
       const v = Math.max(-1, Math.min(1, sum / (i1 - i0)));
       sq += v * v;
+      if (heard) heard[n] = v;
       out[n++] = v < 0 ? v * 0x8000 : v * 0x7fff;
       pos += ratio;
     }
     a.carry = pos - input.length;
     a.pieces.push(out.subarray(0, n));
+    if (heard && n) a.live?.hear(n === heard.length ? heard : heard.slice(0, n), a.total);
     a.chunkSamples += n;
     a.total += n;
     a.peak = Math.max(a.peak, Math.min(1, Math.sqrt(sq / Math.max(1, n)) * 4));
@@ -225,11 +238,12 @@ class Recorder {
     a.pieces = [];
     a.chunkSamples = 0;
     if (length < 1) return;
-    const captions = a.captions.filter((c) => c.t >= offset && c.t < offset + length).map((c) => c.text).join(" ");
+    // Captions that came in late for the minute before go with this one.
+    const cues = a.captions.filter((c) => c.t < offset + length).map((c) => ({ start: Math.max(0, Math.round((c.t - offset) * 10) / 10), text: c.text }));
     a.captions = a.captions.filter((c) => c.t >= offset + length);
     const blob = wavBlob(samples, RATE);
     void saveChunk({ lectureId: this.state.id!, offset, length, blob });
-    a.queue.push({ offset, length, blob, captions, tries: 0 });
+    a.queue.push({ offset, length, blob, cues, tries: 0 });
     this.set({ pending: a.queue.length });
     void this.send();
   }
@@ -247,7 +261,7 @@ class Recorder {
         const res = await fetch(`/api/lectures/${id}/chunk`, {
           method: "POST",
           headers: JSON_HEADERS,
-          body: JSON.stringify({ audio: await base64(job.blob), mimeType: "audio/wav", offset: job.offset, length: job.length, captions: job.captions }),
+          body: JSON.stringify({ audio: await base64(job.blob), mimeType: "audio/wav", offset: job.offset, length: job.length, cues: job.cues }),
         });
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as { segments: Segment[]; duration: number };
@@ -262,13 +276,14 @@ class Recorder {
       }
     }
     a.sending = false;
-    if (this.a === a && this.state.status === "finishing") void this.finish();
+    if (this.a === a && this.state.status === "finishing" && a.last) void this.finish();
   }
 
   // A minute of class came back transcribed. It replaces whatever the note had for that minute,
-  // as on the server, and the browser's captions of it are no longer needed.
+  // as on the server, and the live captions of it are no longer needed.
   private transcribed(job: Job, added: Segment[], duration: number) {
     const end = job.offset + job.length;
+    this.a.covered = Math.max(this.a.covered, end);
     const kept = this.state.segments.filter((s) => s.start < job.offset || s.start >= end);
     this.set({
       segments: [...kept, ...added].sort((x, y) => x.start - y.start),
@@ -308,18 +323,29 @@ class Recorder {
     if (!this.live) return;
     const pausing = this.state.status === "recording";
     this.set({ status: pausing ? "paused" : "recording" });
-    this.draw({ level: 0, now: "" });
-    if (pausing) safe(() => this.a.recog?.stop());
-    else safe(() => this.a.recog?.start());
+    this.draw({ level: 0, now: pausing && this.state.captions === "device" ? this.meter.now : "" });
+    if (pausing) {
+      safe(() => this.a.recog?.stop());
+      void this.a.live?.flush(); // finishes the sentence so far
+    } else safe(() => this.a.recog?.start());
   }
 
   stop() {
     if (!this.live) return;
+    const a = this.a;
     this.set({ status: "finishing" });
-    this.cut();
     this.teardown();
-    this.draw({ level: 0, now: "" });
-    if (!this.a.queue.length && !this.a.sending) void this.finish();
+    this.draw({ level: 0 });
+    // The sentence being said at Stop is finished first, so the last minute has its captions.
+    void (this.state.captions === "device" && a.live ? a.live.flush() : Promise.resolve()).then(() => {
+      if (this.a !== a) return;
+      a.live?.close();
+      a.live = null;
+      this.draw({ now: "" });
+      this.cut();
+      a.last = true;
+      if (!a.queue.length && !a.sending) void this.finish();
+    });
   }
 
   // Sends the minutes that couldn't go through again.
@@ -331,7 +357,7 @@ class Recorder {
   // Writes the notes from what was transcribed, leaving out minutes that couldn't be sent.
   // Their audio stays on this device.
   skipUnsent() {
-    if (this.state.status !== "finishing" || this.a.sending) return;
+    if (this.state.status !== "finishing" || this.a.sending || !this.a.last) return;
     this.a.queue = [];
     void this.finish();
   }
@@ -373,7 +399,57 @@ class Recorder {
     if (this.state.id === id && (this.state.name !== patch.name || this.state.href !== patch.href)) this.set(patch);
   }
 
+  // Live captions: worked out on this device once its speech model is ready (it downloads the
+  // first time), and the browser's own until then, or if it can't run here.
   private startCaptions() {
+    const a = this.a;
+    if (LiveCaptions.supported())
+      try {
+        a.live = new LiveCaptions((e) => this.caption(a, e));
+        this.set({ captionsLoading: 0 });
+      } catch {
+        a.live = null;
+      }
+    this.startSpeech();
+  }
+
+  private caption(a: Rec, e: FromWorker) {
+    if (this.a !== a) return;
+    switch (e.type) {
+      case "progress":
+        return this.set({ captionsLoading: e.done });
+      case "ready": {
+        // What was said while it got ready is captioned too, unless the browser already did.
+        a.live?.catchUp(!a.browserHeard);
+        const recog = a.recog; // the browser's captions aren't needed any more
+        a.recog = null;
+        safe(() => recog?.stop());
+        this.set({ captions: "device", captionsLoading: null });
+        return this.draw({ now: "" });
+      }
+      case "partial":
+        return this.draw({ now: e.text });
+      case "final": {
+        const c = { t: this.state.base + e.start, text: e.text };
+        a.captions.push(c);
+        // Late for a minute that's already transcribed: it's in the transcript.
+        return this.draw({ heard: c.t >= a.covered ? [...this.meter.heard, c].slice(-60) : this.meter.heard, now: "" });
+      }
+      case "error": {
+        console.warn(e.message);
+        a.live?.close();
+        a.live = null;
+        const was = this.state.captions;
+        this.set({ captions: was === "device" ? "" : was, captionsLoading: null });
+        this.draw({ now: "" });
+        if (was === "device" && this.live) this.startSpeech(); // the browser's, if it has them
+        return;
+      }
+    }
+  }
+
+  // The browser's own live captions (Web Speech API).
+  private startSpeech() {
     const Impl = speech();
     if (!Impl) return;
     const a = this.a;
@@ -382,11 +458,13 @@ class Recorder {
     rec.interimResults = true;
     rec.lang = navigator.language || "en-CA";
     rec.onresult = (e) => {
+      if (a.recog !== rec) return;
       let now = "";
       const heard = [...this.meter.heard];
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
         const text = r[0].transcript.trim();
+        if (text) a.browserHeard = true;
         if (!r.isFinal) now += ` ${text}`;
         else if (text) {
           const c = { t: this.now(), text };
@@ -397,15 +475,18 @@ class Recorder {
       this.draw({ heard: heard.slice(-60), now: now.trim() });
     };
     rec.onerror = (e) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") (a.recog = null), this.set({ captions: false });
+      if (a.recog === rec && (e.error === "not-allowed" || e.error === "service-not-allowed")) {
+        a.recog = null;
+        if (this.state.captions === "browser") this.set({ captions: "" });
+      }
     };
     // Recognition stops by itself after a pause in speech; keep it going for the whole class.
     rec.onend = () => {
       if (this.state.status === "recording" && a.recog === rec) setTimeout(() => a.recog === rec && this.state.status === "recording" && safe(() => rec.start()), 250);
     };
     a.recog = rec;
-    this.set({ captions: true });
-    safe(() => rec.start());
+    this.set({ captions: "browser" });
+    if (this.state.status === "recording") safe(() => rec.start()); // or when it resumes
   }
 
   // Keeps the screen on while recording. The lock is let go whenever the page is hidden, so it's

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getAssignments } from "@/lib/canvas";
 import { hasGemini } from "@/lib/gemini";
 import { currentParts, type Lecture, type LectureMine, type LectureParts } from "@/lib/lectures";
+import { notesHtml } from "@/lib/notes-html";
 import { getOne } from "@/lib/store";
 import { courseFromParam, studyHref } from "@/lib/study";
 import NoteView from "./NoteView";
@@ -27,6 +28,7 @@ export default async function NotePage({ params }: { params: Promise<{ course: s
       parts={currentParts(saved?.parts ?? [], lecture.segments)}
       courses={courses}
       gemini={hasGemini()}
+      notesHtml={notesHtml(mine?.myNotes ?? "")}
     />
   );
 }

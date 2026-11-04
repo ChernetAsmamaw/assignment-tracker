@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Crumbs } from "@/components/Doc";
@@ -9,6 +10,7 @@ import { formatDate, isDay } from "@/lib/format";
 import {
   clock,
   draftNotes,
+  markdownLines,
   nextWindow,
   noteDay,
   noteTitle,
@@ -29,6 +31,10 @@ import { serial } from "@/lib/serial";
 import { studyHref } from "@/lib/study";
 import { allLines, ClassNotes, inline } from "./ClassNotes";
 import { EditNotes } from "./EditNotes";
+import type { NoteEditorHandle } from "./NoteEditor";
+
+// The editor loads after the page shows; until then your notes show as the server drew them.
+const NoteEditor = dynamic(() => import("./NoteEditor"), { ssr: false });
 
 type SaveState = "" | "saving" | "saved" | "failed";
 type Typed = { title?: string; myNotes?: string; notes?: LectureNotes; checked?: string[] };
@@ -38,11 +44,12 @@ type Typed = { title?: string; myNotes?: string; notes?: LectureNotes; checked?:
 // long class they build up every 10 minutes, so they're ready soon after it ends. The
 // recording itself runs outside the page (lib/recording.ts), so it carries on while you open
 // other pages.
-export default function NoteView({ lecture: initial, parts: initialParts, courses, gemini }: {
+export default function NoteView({ lecture: initial, parts: initialParts, courses, gemini, notesHtml }: {
   lecture: Lecture;
   parts: NotePart[]; // notes written so far, part by part, while the class recorded
   courses: string[];
   gemini: boolean;
+  notesHtml: string; // your notes, drawn by the server
 }) {
   const router = useRouter();
   const [lecture, setLecture] = useState(initial);
@@ -69,7 +76,7 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
   const [queue] = useState(serial);
   const { hover, bind, keep, hide, close } = useHoverCard<SourcedLine>();
   const titleBox = useRef<HTMLTextAreaElement>(null);
-  const body = useRef<HTMLTextAreaElement>(null);
+  const body = useRef<NoteEditorHandle>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const audio = useRef<{ el: HTMLAudioElement; url: string } | null>(null);
   // The writing below runs across many renders, so it reads the latest lecture and parts from refs.
@@ -336,7 +343,7 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
   // your notes, or notes from its recording. A class being recorded gets one when its notes are done.
   useEffect(() => {
     if (title.trim() || !autoTitle.current || askedTitle.current || live || working || saveState === "saving") return;
-    const enough = hasTranscript ? lecture.segments === initial.segments && (!!lecture.notes || parts.length > 0) : wordCount(mine) >= 12;
+    const enough = hasTranscript ? lecture.segments === initial.segments && (!!lecture.notes || parts.length > 0) : wordCount(markdownLines(mine).join(" ")) >= 12;
     if (!enough) return;
     const t = setTimeout(async () => {
       askedTitle.current = true;
@@ -510,11 +517,11 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
             e.preventDefault();
-            body.current?.focus();
+            body.current?.focus("start");
           }}
         />
 
-        <NoteBody box={body} value={mine} onChange={(text) => (setMine(text), type({ myNotes: text }))} focus={live} />
+        <NoteBody handle={body} html={notesHtml} value={mine} onChange={(text) => (setMine(text), type({ myNotes: text }))} focus={live} />
 
         {err && <div className="callout warn"><span className="callout-ico" aria-hidden>⚠️</span><div>{err}</div></div>}
 
@@ -664,15 +671,22 @@ export default function NoteView({ lecture: initial, parts: initialParts, course
   );
 }
 
-// The page you write on: a borderless box that grows with what you type, like a Notion page.
-function NoteBody({ box, value, onChange, focus }: { box: React.RefObject<HTMLTextAreaElement | null>; value: string; onChange: (text: string) => void; focus: boolean }) {
-  useAutoHeight(box, value);
-  useEffect(() => {
-    if (focus) box.current?.focus();
-  }, [box, focus]);
+// The page you write on, like a Notion page (see NoteEditor). Until the editor has loaded, your
+// notes show as the server drew them, in the same place and style.
+function NoteBody({ handle, html, value, onChange, focus }: {
+  handle: React.RefObject<NoteEditorHandle | null>;
+  html: string;
+  value: string;
+  onChange: (markdown: string) => void;
+  focus: boolean;
+}) {
+  const [ready, setReady] = useState(false);
   return (
     <div className="mine">
-      <textarea ref={box} value={value} rows={1} placeholder="Start writing…" onChange={(e) => onChange(e.target.value)} aria-label="Your notes" />
+      {!ready && <div className="note-md" aria-label="Your notes" {...(html ? { dangerouslySetInnerHTML: { __html: html } } : { children: <p className="is-editor-empty" data-placeholder="Start writing…" /> })} />}
+      <div hidden={!ready}>
+        <NoteEditor value={value} onChange={onChange} focus={focus} handle={handle} onReady={() => setReady(true)} />
+      </div>
     </div>
   );
 }

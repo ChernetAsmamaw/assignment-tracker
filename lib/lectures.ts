@@ -122,7 +122,7 @@ export const noteTitle = (l: Pick<Lecture, "title">) => l.title.trim() || "Untit
 
 // The first line of what you wrote, or of the written notes, for lists.
 export function notePreview(l: Lecture, mine?: string): string {
-  const first = (mine ?? l.myNotes ?? "").split("\n").map((x) => x.trim()).find(Boolean);
+  const first = markdownLines(mine ?? l.myNotes ?? "")[0];
   if (first) return first.slice(0, 160);
   const line = l.notes?.summary[0] ?? l.notes?.takeaways?.[0] ?? l.notes?.sections[0]?.bullets[0];
   if (line) return plain(line.text);
@@ -131,6 +131,26 @@ export function notePreview(l: Lecture, mine?: string): string {
 
 // A note line without its Markdown marks.
 export const plain = (text: string) => text.replace(/\*\*|`/g, "");
+
+// Your notes (Markdown) as lines of plain text: no #, list marks, ** or link addresses, and none
+// of the lines that are only markup, like a table's --- row or a code fence.
+export function markdownLines(markdown: string): string[] {
+  return markdown
+    .split("\n")
+    .map((line) => {
+      const l = line.replace(/&nbsp;|\u00a0/g, " ").trim();
+      if (/^(```|~~~)/.test(l) || /^([-*_])( *\1){2,}$/.test(l) || (/^\|?[\s:|-]+\|?$/.test(l) && l.includes("-"))) return "";
+      return l
+        .replace(/^(?:#{1,6}\s+|>\s?|[-*+]\s+(?:\[[ xX]\]\s+)?|\d{1,3}[.)]\s+)+/, "")
+        .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+        .replace(/\*\*|__|~~|`/g, "")
+        .replace(/^\|\s*|\s*\|$/g, "")
+        .replace(/\s+\|\s+/g, " · ")
+        .replace(/\\([\\`*_{}[\]()#+\-.!|>~<])/g, "$1")
+        .trim();
+    })
+    .filter(Boolean);
+}
 
 export const clock = (sec: number) => {
   const s = Math.max(0, Math.floor(sec));
@@ -146,14 +166,21 @@ const TRANSCRIBE =
   "You transcribe university lecture recordings word for word. Write only what is actually said. " +
   "Never add, summarise or guess at words you can't hear; skip silence and unintelligible parts.";
 
+// A line of the live captions, `start` seconds into its chunk.
+export interface Cue {
+  start: number;
+  text: string;
+}
+
 // Turns one recorded chunk into transcript segments. `offset` is where the chunk starts in the
-// lecture. `fallback` is what the browser's live captions heard in the same window; it is used
-// when Gemini isn't available, so the recorder still works without a key.
+// lecture. `fallback` is what the live captions heard in the same window, with when each line was
+// said (older recorders send it as one string); it is used when Gemini isn't available, so the
+// recorder still works without a key.
 export async function transcribeChunk(
   audio: { mimeType: string; data: string } | null,
   offset: number,
   length: number,
-  fallback: string,
+  fallback: Cue[] | string,
 ): Promise<{ segments: Omit<Segment, "id">[]; ai: boolean }> {
   if (audio && hasGemini()) {
     try {
@@ -179,10 +206,20 @@ export async function transcribeChunk(
       console.error("transcribe", e);
     }
   }
-  // Live captions: split into sentences and spread them across the chunk.
-  const sentences = splitSentences(fallback);
-  const step = length / Math.max(1, sentences.length);
-  return { segments: timed(sentences.map((text, i) => ({ start: i * step, text })), offset, length), ai: false };
+  return { segments: timed(captionRows(fallback, length), offset, length), ai: false };
+}
+
+// Live captions as transcript rows: each line at the time it was said, cut into sentences spread
+// over it. Untimed captions are spread across the whole chunk.
+function captionRows(fallback: Cue[] | string, length: number): { start: number; text: string }[] {
+  const cues = (typeof fallback === "string" ? [{ start: 0, text: fallback }] : fallback)
+    .map((c) => ({ start: Math.min(length, Math.max(0, Number(c.start) || 0)), text: String(c.text ?? "") }))
+    .sort((a, b) => a.start - b.start);
+  return cues.flatMap((c, i) => {
+    const sentences = splitSentences(c.text);
+    const step = ((cues[i + 1]?.start ?? length) - c.start) / Math.max(1, sentences.length);
+    return sentences.map((text, j) => ({ start: c.start + j * step, text }));
+  });
 }
 
 function timed(rows: { start: number; text: string }[], offset: number, length: number): Omit<Segment, "id">[] {

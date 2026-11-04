@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { clock, type Segment } from "@/lib/lectures";
-import { recording, useMeter, useRecording, type Meter } from "@/lib/recording";
+import { recording, useMeter, useRecording, type Meter, type RecState } from "@/lib/recording";
 
 // The recorder floats over every page while a class records, so you can open the rest of Pace
-// without stopping it, and links back to the note. Its transcript opens above it to show what's
-// being transcribed as the class goes on.
+// without stopping it, and links back to the note. Above it, the live captions show what's being
+// said as it's said, and its transcript opens to show the whole class so far.
 export default function RecordingDock() {
   const s = useRecording();
   const m = useMeter();
@@ -57,9 +57,14 @@ export default function RecordingDock() {
     <div className="rec-dock" role="region" aria-label="Recording">
       {s.error && <div className="rec-note" role="alert">{s.error}</div>}
       {open && s.status !== "writing" ? (
-        <LiveTranscript lines={s.segments.filter((x) => x.start >= s.base)} meter={m} captions={s.captions} onClose={() => setOpen(false)} />
+        <LiveTranscript lines={s.segments.filter((x) => x.start >= s.base)} meter={m} captions={s.captions} loading={s.captionsLoading} onClose={() => setOpen(false)} />
       ) : (
-        live && s.captions && <div className="rec-caption">{m.now || m.heard.at(-1)?.text || <span className="faint">Listening…</span>}</div>
+        live &&
+        (s.captions || s.captionsLoading != null) && (
+          <div className="rec-caption" aria-live="polite">
+            {m.now || m.heard.at(-1)?.text || <span className="faint">{s.captionsLoading != null ? getting(s.captionsLoading) : "Listening…"}</span>}
+          </div>
+        )
       )}
       <div className={`rec-pill ${s.status}`}>
         {live ? (
@@ -104,9 +109,11 @@ export default function RecordingDock() {
   );
 }
 
+const getting = (done: number | null) => `Getting live captions ready… ${Math.round((done ?? 0) * 100)}%`;
+
 // What's been transcribed this recording, newest at the bottom. Each minute is transcribed about a
-// minute after it's said; the browser's own captions (in gray) fill in what's being said now.
-function LiveTranscript({ lines, meter, captions, onClose }: { lines: Segment[]; meter: Meter; captions: boolean; onClose: () => void }) {
+// minute after it's said; the live captions (in gray) fill in what's being said now.
+function LiveTranscript({ lines, meter, captions, loading, onClose }: { lines: Segment[]; meter: Meter; captions: RecState["captions"]; loading: number | null; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true); // follow new lines, unless you've scrolled up to read
   const shown = lines.slice(-400);
@@ -119,7 +126,7 @@ function LiveTranscript({ lines, meter, captions, onClose }: { lines: Segment[];
     <div className="rec-live" role="log" aria-label="Live transcript">
       <div className="rec-live-head">
         <strong>Live transcript</strong>
-        <span>{captions ? "Gray is what's being heard now" : "Each minute appears about a minute later"}</span>
+        <span>{loading != null ? getting(loading) : captions ? "Gray is what's being said now" : "Each minute appears about a minute later"}</span>
         <button type="button" onClick={onClose} aria-label="Collapse the transcript">▾</button>
       </div>
       <div
@@ -148,7 +155,11 @@ function LiveTranscript({ lines, meter, captions, onClose }: { lines: Segment[];
             {meter.now}
           </p>
         )}
-        {empty && <p className="rec-live-empty">The transcript shows here as the class goes on, a minute at a time.</p>}
+        {empty && (
+          <p className="rec-live-empty">
+            {captions ? "What's said shows here as it's said, and the transcript replaces it a minute at a time." : "The transcript shows here as the class goes on, a minute at a time."}
+          </p>
+        )}
       </div>
     </div>
   );

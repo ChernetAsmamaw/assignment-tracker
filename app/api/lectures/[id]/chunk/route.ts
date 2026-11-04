@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { transcribeChunk, type Lecture } from "@/lib/lectures";
+import { transcribeChunk, type Cue, type Lecture } from "@/lib/lectures";
 import { getOne, putOne, saveError } from "@/lib/store";
 
 export const maxDuration = 60;
@@ -7,14 +7,18 @@ export const maxDuration = 60;
 // One recorded chunk (about a minute of audio). The recorder sends chunks one at a time, in order.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const b = (await req.json().catch(() => ({}))) as { audio?: string; mimeType?: string; offset?: number; length?: number; captions?: string };
+  const b = (await req.json().catch(() => ({}))) as { audio?: string; mimeType?: string; offset?: number; length?: number; cues?: Cue[]; captions?: string };
   const offset = Math.max(0, Number(b.offset) || 0);
   const length = Math.min(600, Math.max(1, Number(b.length) || 60));
   const mimeType = String(b.mimeType ?? "audio/webm").split(";")[0];
   const audio = b.audio ? { mimeType, data: String(b.audio) } : null;
 
   // Transcribe before loading the lecture, so the read-modify-write below stays short.
-  const { segments, ai } = await transcribeChunk(audio, offset, length, String(b.captions ?? "").slice(0, 20_000));
+  // What the live captions heard, for when Gemini can't transcribe it.
+  const cues = Array.isArray(b.cues)
+    ? b.cues.slice(0, 400).map((c) => ({ start: Number(c?.start) || 0, text: String(c?.text ?? "").slice(0, 2000) }))
+    : String(b.captions ?? "").slice(0, 20_000);
+  const { segments, ai } = await transcribeChunk(audio, offset, length, cues);
 
   const lecture = await getOne<Lecture>("lectures", id);
   if (!lecture) return NextResponse.json({ error: "Not found" }, { status: 404 });

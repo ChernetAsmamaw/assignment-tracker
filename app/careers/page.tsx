@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { hasGemini } from "@/lib/gemini";
-import { getProfile, listOpportunities } from "@/lib/careers-store";
+import { addSeedRoles, getProfile, listOpportunities } from "@/lib/careers-store";
 import { deadlineInfo, isInFlight, isToApply, torontoToday } from "@/lib/careers";
 import CareerBoard from "./CareerBoard";
 
 export const dynamic = "force-dynamic";
 
 export default async function CareersPage() {
+  await addSeedRoles().catch((e) => console.error("seed roles", e));
   const [all, profile] = await Promise.all([listOpportunities(), getProfile()]);
   const items = all.filter((o) => o.status !== "dismissed");
   const today = torontoToday();

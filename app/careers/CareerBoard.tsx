@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  deadlineInfo, formatDay, isInFlight, isToApply, KIND_LABEL, nextStep, OPP_KINDS, planProgress, sortPriority, sortRelevance, STATUS_LABEL,
-  type Opportunity,
+  deadlineInfo, formatDay, isInFlight, isToApply, KIND_LABEL, nextStep, OPP_KINDS, PIPELINE, planProgress, sortRelevance, STATUS_LABEL,
+  type Opportunity, type OppStatus,
 } from "@/lib/careers";
 
 const put = (id: string, body: Partial<Opportunity>) =>
@@ -23,11 +23,7 @@ export default function CareerBoard({ items: initial, today, gemini }: { items: 
   };
 
   const inbox = sortRelevance(items.filter((o) => o.status === "suggested"));
-  const toApply = items.filter(isToApply);
-  const priority = sortPriority(toApply.filter((o) => o.priority));
-  const rest = sortRelevance(toApply.filter((o) => !o.priority));
-  const applied = sortPriority(items.filter(isInFlight));
-  const closed = items.filter((o) => o.status === "closed");
+  const listed = items.filter((o) => o.status !== "suggested");
 
   return (
     <>
@@ -35,82 +31,143 @@ export default function CareerBoard({ items: initial, today, gemini }: { items: 
 
       <AddOpportunity gemini={gemini} />
 
-      <div className="section-title"><span className="star-ico">★</span> Priority <span className="count">{priority.length}</span></div>
-      <p className="muted small" style={{ margin: "-6px 0 12px" }}>The ones you&apos;ve decided to go after, soonest deadline first. Star an opportunity to move it here.</p>
-      {priority.length === 0 && <p className="empty">Nothing starred yet. Star the applications you want to focus on.</p>}
-      <div className="opp-list">{priority.map((o) => <Row key={o.id} o={o} today={today} patch={patch} />)}</div>
-
-      <div className="section-title">◎ By relevance <span className="count">{rest.length}</span></div>
-      <p className="muted small" style={{ margin: "-6px 0 12px" }}>Everything else on your list, ranked by how well it fits your background and location.</p>
-      {rest.length === 0 && <p className="empty">Add an opportunity above, or accept one the Scout found.</p>}
-      <div className="opp-list">{rest.map((o) => <Row key={o.id} o={o} today={today} patch={patch} />)}</div>
-
-      {applied.length > 0 && (
-        <>
-          <div className="section-title">Applied <span className="count">{applied.length}</span></div>
-          <div className="opp-list">{applied.map((o) => <Row key={o.id} o={o} today={today} patch={patch} />)}</div>
-        </>
-      )}
-
-      {closed.length > 0 && (
-        <details className="done-block" style={{ marginTop: 24 }}>
-          <summary className="muted small"> Closed ({closed.length})</summary>
-          <div className="opp-list" style={{ marginTop: 10 }}>{closed.map((o) => <Row key={o.id} o={o} today={today} patch={patch} />)}</div>
-        </details>
-      )}
+      <RolesTable items={listed} today={today} patch={patch} />
     </>
   );
 }
 
-function Due({ o, today }: { o: Opportunity; today: string }) {
-  const d = deadlineInfo(o.deadline, today);
+type Filter = "all" | "open" | "applied" | "closed";
+type SortKey = "deadline" | "fit" | "role";
+
+const FILTERS: { key: Filter; label: string; test: (o: Opportunity) => boolean }[] = [
+  { key: "all", label: "All", test: (o) => o.status !== "closed" },
+  { key: "open", label: "Not applied", test: isToApply },
+  { key: "applied", label: "Applied", test: isInFlight },
+  { key: "closed", label: "Closed", test: (o) => o.status === "closed" },
+];
+
+const byDeadline = (a: Opportunity, b: Opportunity) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999");
+const SORTS: Record<SortKey, (a: Opportunity, b: Opportunity) => number> = {
+  deadline: (a, b) => byDeadline(a, b) || b.relevance - a.relevance,
+  fit: (a, b) => b.relevance - a.relevance || byDeadline(a, b),
+  role: (a, b) => a.title.localeCompare(b.title) || a.organization.localeCompare(b.organization),
+};
+
+function RolesTable({ items, today, patch }: { items: Opportunity[]; today: string; patch: (id: string, b: Partial<Opportunity>) => void }) {
+  const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<SortKey>("deadline");
+  const [starredFirst, setStarredFirst] = useState(true);
+  const [q, setQ] = useState("");
+
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (o: Opportunity) => {
+    const hay = `${o.title} ${o.organization} ${o.location} ${KIND_LABEL[o.kind]}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  };
+  const test = FILTERS.find((f) => f.key === filter)!.test;
+  const rows = items
+    .filter((o) => test(o) && matches(o))
+    .sort((a, b) => (starredFirst ? Number(b.priority) - Number(a.priority) : 0) || SORTS[sort](a, b));
+
+  const toggleApplied = (o: Opportunity) =>
+    patch(o.id, { status: isInFlight(o) ? (o.plan ? "preparing" : "saved") : "applied" });
+
+  const Th = ({ k, children, className }: { k: SortKey; children: React.ReactNode; className?: string }) => (
+    <th className={className} aria-sort={sort === k ? (k === "fit" ? "descending" : "ascending") : undefined}>
+      <button type="button" className={`th-sort ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>
+        {children}{sort === k && <span aria-hidden> {k === "fit" ? "↓" : "↑"}</span>}
+      </button>
+    </th>
+  );
+
   return (
-    <div className={`opp-due u-${d.urgency}`}>
-      {d.days != null && d.days >= 0 ? (
-        <>
-          <span className="cd-value">{d.days}</span>
-          <span className="cd-label">{d.days === 1 ? "day left" : "days left"}</span>
-        </>
+    <section className="roles">
+      <div className="section-title">Roles <span className="count">{items.filter((o) => o.status !== "closed").length}</span></div>
+      <div className="roles-bar">
+        <input type="search" className="roles-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by role, company or city" aria-label="Search roles" />
+        <div className="seg" role="tablist" aria-label="Filter roles">
+          {FILTERS.map((f) => (
+            <button key={f.key} type="button" role="tab" aria-selected={filter === f.key} className={filter === f.key ? "on" : ""} onClick={() => setFilter(f.key)}>
+              {f.label} <span className="seg-n">{items.filter(f.test).length}</span>
+            </button>
+          ))}
+        </div>
+        <label className="small muted roles-pin">
+          <input type="checkbox" checked={starredFirst} onChange={(e) => setStarredFirst(e.target.checked)} /> Starred first
+        </label>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="empty">{items.length === 0 ? "Add an opportunity above, or accept one the Scout found." : "No roles match. Try another filter or search."}</p>
       ) : (
-        <span className="cd-label">{d.days == null ? "Rolling" : "Closed"}</span>
+        <div className="roles-wrap">
+          <table className="roles-table">
+            <thead>
+              <tr>
+                <th className="c-star"><span className="sr-only">Priority</span></th>
+                <Th k="role">Role</Th>
+                <Th k="deadline" className="c-due">Deadline</Th>
+                <Th k="fit" className="c-fit">Fit</Th>
+                <th className="c-status">Status</th>
+                <th className="c-applied">Applied</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((o) => <RoleRow key={o.id} o={o} today={today} patch={patch} toggleApplied={toggleApplied} />)}
+            </tbody>
+          </table>
+        </div>
       )}
-      <span className="small">{o.deadline ? formatDay(o.deadline) : "No deadline"}</span>
-    </div>
+    </section>
+  );
+}
+
+function RoleRow({ o, today, patch, toggleApplied }: { o: Opportunity; today: string; patch: (id: string, b: Partial<Opportunity>) => void; toggleApplied: (o: Opportunity) => void }) {
+  const d = deadlineInfo(o.deadline, today);
+  const applied = isInFlight(o);
+  const step = nextStep(o);
+  const pct = planProgress(o);
+  return (
+    <tr className={`${applied ? "is-applied" : ""} ${o.status === "closed" ? "is-closed" : ""}`}>
+      <td className="c-star">
+        <button type="button" className={`star ${o.priority ? "on" : ""}`} aria-pressed={o.priority} title={o.priority ? "Remove from priority" : "Mark as priority"} onClick={() => patch(o.id, { priority: !o.priority })}>
+          {o.priority ? "★" : "☆"}
+        </button>
+      </td>
+      <td className="c-role">
+        <Link href={`/careers/${o.id}`} className="opp-title">{o.title}</Link>
+        <div className="muted small">{[o.organization, o.location].filter(Boolean).join(" · ")}</div>
+        <div className="role-meta small">
+          <span className="chip">{KIND_LABEL[o.kind]}</span>
+          {o.url && <a href={o.url} target="_blank" rel="noreferrer">Posting ↗</a>}
+          {o.plan ? (
+            <span className="muted">{step ? <>Next: {step.title} ({pct}%)</> : "Plan done"}</span>
+          ) : (
+            isToApply(o) && <Link href={`/careers/${o.id}`}>✦ Plan</Link>
+          )}
+        </div>
+      </td>
+      <td className={`c-due u-${applied ? "none" : d.urgency}`} data-label="Deadline">
+        <span className="due-day">{o.deadline ? formatDay(o.deadline, true) : "No deadline"}</span>
+        <span className="due-left small">{applied && o.appliedAt ? `Applied ${formatDay(o.appliedAt.slice(0, 10))}` : d.label}</span>
+      </td>
+      <td className="c-fit" data-label="Fit"><Fit n={o.relevance} /></td>
+      <td className="c-status" data-label="Status">
+        <select value={o.status} aria-label={`Status for ${o.title}`} className={`status-select st-${o.status}`} onChange={(e) => patch(o.id, { status: e.target.value as OppStatus })}>
+          {PIPELINE.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+        </select>
+      </td>
+      <td className="c-applied" data-label="Applied">
+        <button type="button" role="switch" aria-checked={applied} aria-label={applied ? `Mark ${o.title} as not applied` : `Mark ${o.title} as applied`} className={`switch ${applied ? "on" : ""}`} onClick={() => toggleApplied(o)} disabled={o.status === "closed"}>
+          <span className="knob" />
+        </button>
+        <span className="switch-label small">{applied ? "Yes" : "No"}</span>
+      </td>
+    </tr>
   );
 }
 
 const Fit = ({ n }: { n: number }) => <span className={`fit ${n >= 80 ? "hi" : n >= 60 ? "mid" : "lo"}`}>{n}% fit</span>;
-
-function Row({ o, today, patch }: { o: Opportunity; today: string; patch: (id: string, b: Partial<Opportunity>) => void }) {
-  const step = nextStep(o);
-  const pct = planProgress(o);
-  return (
-    <div className="opp-row">
-      <button type="button" className={`star ${o.priority ? "on" : ""}`} aria-pressed={o.priority} title={o.priority ? "Remove from priority" : "Mark as priority"} onClick={() => patch(o.id, { priority: !o.priority })}>
-        {o.priority ? "★" : "☆"}
-      </button>
-      <div className="opp-main">
-        <div className="tags">
-          <span className="chip">{KIND_LABEL[o.kind]}</span>
-          <Fit n={o.relevance} />
-          <span className={`pill st-${o.status}`}>{STATUS_LABEL[o.status]}</span>
-        </div>
-        <Link href={`/careers/${o.id}`} className="opp-title">{o.title}</Link>
-        <div className="muted small">{[o.organization, o.location, o.startDate && `Starts ${o.startDate}`].filter(Boolean).join(" · ")}</div>
-        {o.whyRelevant && <div className="small why">{o.whyRelevant}</div>}
-        {o.plan ? (
-          <div className="next-step">
-            <div className="meter"><span style={{ width: `${pct}%` }} /></div>
-            <span className="small">{step ? <>Next: <strong>{step.title}</strong> · {step.due <= today ? <span className="overdue">{step.due < today ? "overdue" : "today"}</span> : formatDay(step.due)}</> : "Every step done"}</span>
-          </div>
-        ) : (
-          isToApply(o) && <Link href={`/careers/${o.id}`} className="small">✦ Get an application plan →</Link>
-        )}
-      </div>
-      <Due o={o} today={today} />
-    </div>
-  );
-}
 
 function Inbox({ items, today, gemini, patch }: { items: Opportunity[]; today: string; gemini: boolean; patch: (id: string, b: Partial<Opportunity>) => void }) {
   const [busy, setBusy] = useState(false);

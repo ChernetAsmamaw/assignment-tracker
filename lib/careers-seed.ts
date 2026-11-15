@@ -27,4 +27,24 @@ export const SEED_ROLES: SeedRole[] = [
       "Rolling, highly selective recruitment, so apply early. Interviews usually run November to March. As of Nov 15, 2026 the iCIMS page said there were no openings posted yet, so check the link for when the application opens.",
     priority: true,
   },
+  {
+    id: "wfusm-bds-summer-2027",
+    title: "Biostatistics and Data Science Summer Internship 2027",
+    organization: "Wake Forest University School of Medicine",
+    kind: "internship",
+    location: "Winston-Salem, NC (hybrid, at least 1 day a week in person)",
+    url: "https://redcap.school.wakehealth.edu/surveys/?s=XKLNWJF7LTE49EMP",
+    deadline: null,
+    startDate: "Summer 2027, about 8 weeks (June to July in past years)",
+    summary:
+      "Paid summer internship in the Department of Biostatistics and Data Science. You apply through the REDCap intake survey at the link and upload your resume there.",
+    requirements: [
+      "Undergraduate or graduate student in biostatistics, math, bioinformatics, epidemiology, data science or a related field",
+      "U.S. citizen, permanent resident or F-1 visa holder (2026 rules)",
+      "Priority to applicants living or studying in North Carolina and nearby states (2026 rules)",
+    ],
+    notes:
+      "The survey page couldn't be read automatically, so the title and details come from the department's 2025 and 2026 postings. Check them when you open the form. The deadline was Jan 31 in both 2025 and 2026, so expect late January 2027; set the real date once you see it.",
+    priority: true,
+  },
 ];
